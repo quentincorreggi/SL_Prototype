@@ -44,6 +44,7 @@ registerBucketType('default', {
   },
 
   editorCellHTML: function (ci) {
-    return '<span class="ed-cell-dot">' + CLR_NAMES[ci][0].toUpperCase() + '</span>';
+    // Colored cell background is the identifier — no letter needed.
+    return '';
   }
 });

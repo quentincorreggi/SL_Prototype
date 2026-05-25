@@ -79,19 +79,29 @@
     font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;
     display:flex;align-items:center;justify-content:center;pointer-events:none;border:1.5px solid #fff}
 
-  #ed-toolbar,#ed-sand-toolbar{display:flex;flex-direction:column;gap:6px;align-items:center;margin-bottom:8px}
-  .ed-type-row,.ed-color-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+  /* Bucket-grid toolbar is two stacked rows (type tabs, then color row).
+     Sand toolbar is a single color row. Both keep colors in ONE horizontal
+     line — scrolls horizontally if the palette overflows the section width. */
+  #ed-toolbar{display:flex;flex-direction:column;gap:6px;align-items:stretch;margin-bottom:8px}
+  .ed-type-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+  .ed-color-row,#ed-sand-toolbar{display:flex;flex-direction:row;gap:4px;flex-wrap:nowrap;
+    overflow-x:auto;justify-content:flex-start;padding:4px 2px;margin-bottom:6px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .ed-color-row::-webkit-scrollbar,#ed-sand-toolbar::-webkit-scrollbar{height:5px}
+  .ed-color-row::-webkit-scrollbar-thumb,#ed-sand-toolbar::-webkit-scrollbar-thumb{
+    background:rgba(160,140,120,0.45);border-radius:3px}
   .ed-type-btn{padding:5px 12px;border:2px solid rgba(120,100,80,0.2);border-radius:8px;
     font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;cursor:pointer;
     color:#5A4A38;background:rgba(180,165,145,0.25);transition:all 0.15s}
   .ed-type-btn.active{background:rgba(123,82,160,0.2);border-color:rgba(123,82,160,0.5);color:#7B52A0}
   .ed-type-btn:hover{transform:scale(1.05)}
-  .ed-tool{width:32px;height:32px;border:2.5px solid transparent;border-radius:8px;
-    color:white;font-weight:700;font-size:12px;font-family:'Fredoka',sans-serif;
-    cursor:pointer;transition:transform 0.15s,border-color 0.15s,box-shadow 0.15s;
-    display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px rgba(0,0,0,0.2)}
+  .ed-tool{width:30px;height:30px;flex-shrink:0;border:2px solid rgba(120,100,80,0.30);border-radius:7px;
+    color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
+    cursor:pointer;transition:transform 0.12s,border-color 0.15s,box-shadow 0.15s;
+    display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px rgba(0,0,0,0.3);
+    padding:0}
   .ed-tool:hover{transform:scale(1.10)}.ed-tool:active{transform:scale(0.9)}
-  .ed-tool.active{border-color:rgba(90,60,30,0.7);box-shadow:0 0 0 3px rgba(139,105,20,0.25),0 3px 10px rgba(0,0,0,0.15)}
+  .ed-tool.active{border-color:rgba(90,60,30,0.85);box-shadow:0 0 0 2px rgba(139,105,20,0.35),0 2px 8px rgba(0,0,0,0.15)}
   .ed-quick{display:flex;gap:6px;justify-content:center;margin-top:6px;flex-wrap:wrap}
   .ed-qbtn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
     cursor:pointer;color:#5A4A38;background:rgba(180,165,145,0.35);transition:transform 0.12s}
