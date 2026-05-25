@@ -36,7 +36,7 @@ jobs:
             git checkout --orphan gh-pages
             git rm -rf .
             touch .nojekyll
-            echo '<!DOCTYPE html><html><head><title>MS_Phaty Previews</title></head><body><h1>MS_Phaty Branch Previews</h1><p>Previews are at /&lt;branch-name&gt;--&lt;sha&gt;/</p></body></html>' > index.html
+            echo '<!DOCTYPE html><html><head><title>SL_Prototype Previews</title></head><body><h1>SL_Prototype Branch Previews</h1><p>Previews are at /&lt;branch-name&gt;--&lt;sha&gt;/</p></body></html>' > index.html
             echo '{"prototypes":[]}' > manifest.json
             git add .nojekyll index.html manifest.json
             git commit -m "Initialize gh-pages branch"

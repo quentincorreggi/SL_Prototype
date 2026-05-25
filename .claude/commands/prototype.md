@@ -1,6 +1,6 @@
 # Prototype a New Mechanic
 
-Guide the user through creating a new game mechanic prototype for Marble Sorter.
+Guide the user through creating a new game mechanic prototype for Sand Loop.
 
 ## Steps
 
@@ -14,13 +14,15 @@ Guide the user through creating a new game mechanic prototype for Marble Sorter.
 
    - **How it works** — The core rules and behavior. What happens when the
      player encounters this mechanic? What are the edge cases (e.g., what
-     happens if it interacts with ice boxes, blockers, tunnels, or walls)?
-     Propose sensible defaults for anything the user didn't specify.
+     happens if it interacts with hidden buckets, tunnels, walls, or the
+     falling-sand physics)? Propose sensible defaults for anything the user
+     didn't specify.
 
    - **How the player uses it** — The interaction model. Is it tap-based
-     like regular boxes? Does it require timing, multiple taps, dragging, or
+     like regular buckets? Does it require timing, multiple taps, dragging, or
      something else? If it changes how existing interactions work (e.g.,
-     marbles behave differently on the belt), explain that.
+     buckets behave differently on the belt, sand behaves differently in
+     the image), explain that.
 
    - **What it looks and sounds like** — Visual appearance on the grid (color,
      shape, icon, animation). What happens visually when the mechanic
@@ -30,7 +32,7 @@ Guide the user through creating a new game mechanic prototype for Marble Sorter.
    - **How it appears in the level editor** — What toolbar button or mode is
      added? What color/icon represents it? Can the user configure it (e.g.,
      set a timer duration, choose a target color)? If the mechanic uses the
-     existing box type registry, it auto-appears in the toolbar — mention
+     existing bucket type registry, it auto-appears in the toolbar — mention
      this so the user knows.
 
    End by asking: "Does this match what you had in mind? Feel free to change
@@ -48,7 +50,7 @@ Guide the user through creating a new game mechanic prototype for Marble Sorter.
      GitHub Pages root. Do NOT use `claude/` or any other prefix.
 
 4. **Implement the mechanic** following the patterns in CLAUDE.md:
-   - For new box types: create `js/box_<name>.js`, register it, add `<script>` tag to `index.html`
+   - For new bucket types: create `js/bucket_<name>.js`, register it, add `<script>` tag to `index.html`
    - For other mechanics: create new JS file or modify existing ones as needed
    - Follow all conventions: `var` not `const`, global functions, vanilla JS only
    - Add at least one showcase level to the `LEVELS` array in `config.js` that demonstrates the mechanic

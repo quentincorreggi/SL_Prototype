@@ -1,32 +1,25 @@
 // ============================================================
 // calibration.js — Calibration panel sliders
 // ============================================================
+//
+// Defensive: every getElementById is guarded so the page works even if
+// the calibration UI hasn't been built yet. The first prototype branch
+// will add the actual sliders in index.html and wire them here.
+// ============================================================
 
-var calPanel = document.getElementById('cal-panel');
 var calVisible = false;
 
 function toggleCal() {
+  var panel = document.getElementById('cal-panel');
+  if (!panel) return;
   calVisible = !calVisible;
-  calPanel.style.display = calVisible ? 'block' : 'none';
+  panel.style.display = calVisible ? 'block' : 'none';
 }
-document.getElementById('cal-toggle').addEventListener('click', toggleCal);
 
-document.getElementById('gravSlider').addEventListener('input', function () {
-  PHYS_GRAVITY = parseInt(this.value) / 100;
-  document.getElementById('gravVal').textContent = this.value;
-});
-document.getElementById('beltSlider').addEventListener('input', function () {
-  BELT_SPEED = parseInt(this.value) / 10000;
-  document.getElementById('beltVal').textContent = this.value;
-});
-document.getElementById('lipSlider').addEventListener('input', function () {
-  LIP_PCT = parseInt(this.value) / 100;
-  document.getElementById('lipVal').textContent = this.value;
-});
-document.getElementById('mrbGapSlider').addEventListener('input', function () {
-  MRB_GAP_FACTOR = parseInt(this.value) / 100;
-  document.getElementById('mrbGapVal').textContent = this.value;
-});
+(function bindCalToggle() {
+  var btn = document.getElementById('cal-toggle');
+  if (btn) btn.addEventListener('click', toggleCal);
+})();
 
 function hookCal(id, obj, key, factor) {
   var el = document.getElementById(id);
@@ -34,14 +27,9 @@ function hookCal(id, obj, key, factor) {
   if (!el) return;
   el.addEventListener('input', function () {
     obj[key] = parseFloat(el.value) * factor;
-    valEl.textContent = el.value;
-    computeLayout();
-    updateStockPositions();
+    if (valEl) valEl.textContent = el.value;
+    if (typeof computeLayout === 'function') computeLayout();
   });
 }
-hookCal('cs-dx', cal.stock, 'dx', 1); hookCal('cs-dy', cal.stock, 'dy', 1); hookCal('cs-s', cal.stock, 's', 0.01);
-hookCal('cf-dx', cal.funnel, 'dx', 1); hookCal('cf-dy', cal.funnel, 'dy', 1); hookCal('cf-sw', cal.funnel, 'sw', 0.01); hookCal('cf-sh', cal.funnel, 'sh', 0.01);
-hookCal('cb-dx', cal.belt, 'dx', 1); hookCal('cb-dy', cal.belt, 'dy', 1); hookCal('cb-sw', cal.belt, 'sw', 0.01); hookCal('cb-sh', cal.belt, 'sh', 0.01);
-hookCal('co-dx', cal.sort, 'dx', 1); hookCal('co-dy', cal.sort, 'dy', 1); hookCal('co-s', cal.sort, 's', 0.01);
-hookCal('cm-s', cal.marble, 's', 0.01);
-hookCal('cbk-dx', cal.back, 'dx', 1); hookCal('cbk-dy', cal.back, 'dy', 1); hookCal('cbk-s', cal.back, 's', 0.01);
+
+// Future: bind sliders for cal.image, cal.belt, cal.grid here.

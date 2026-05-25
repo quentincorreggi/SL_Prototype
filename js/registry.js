@@ -1,31 +1,33 @@
 // ============================================================
-// registry.js — Mechanic registration system
+// registry.js — Bucket type registration system
 // ============================================================
 //
-// Box types register: drawClosed, drawReveal, plus editor metadata.
-// The core engine calls these without knowing about specific types.
+// Bucket types register: drawActive, drawInactive, drawOnBelt, plus
+// editor metadata. The core engine calls these without knowing about
+// specific types.
 //
-// To add a new box type, create js/boxes/box_yourtype.js and call:
-//   registerBoxType('yourtype', { ... });
+// To add a new bucket type, create js/bucket_yourtype.js and call:
+//   registerBucketType('yourtype', { ... });
 //
 // Required interface:
 //   label        : string — display name in editor toolbar
 //   editorColor  : string — button color in editor
-//   drawClosed(ctx, x, y, w, h, ci, S, tick, idlePhase)
-//   drawReveal(ctx, x, y, w, h, ci, S, phase, remaining, tick)
+//   drawActive(ctx, x, y, w, h, ci, S, tick, idlePhase)
+//   drawInactive(ctx, x, y, w, h, ci, S, tick)
+//   drawOnBelt(ctx, x, y, w, h, ci, S, fill, capacity, tick)
 //   editorCellStyle(ci)   — returns { background, borderColor }
 //   editorCellHTML(ci)     — returns inner HTML for editor grid cell
 // ============================================================
 
-var BoxTypes = {};
-var BoxTypeOrder = []; // insertion order for toolbar
+var BucketTypes = {};
+var BucketTypeOrder = []; // insertion order for toolbar
 
-function registerBoxType(id, def) {
+function registerBucketType(id, def) {
   def.id = id;
-  BoxTypes[id] = def;
-  BoxTypeOrder.push(id);
+  BucketTypes[id] = def;
+  BucketTypeOrder.push(id);
 }
 
-function getBoxType(id) {
-  return BoxTypes[id] || BoxTypes[BoxTypeOrder[0]];
+function getBucketType(id) {
+  return BucketTypes[id] || BucketTypes[BucketTypeOrder[0]];
 }
