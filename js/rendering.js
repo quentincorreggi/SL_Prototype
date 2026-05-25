@@ -38,12 +38,23 @@ function rRect(x, y, w, h, r) {
 function drawFrame() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
+  // Apply screen-shake to everything except the background.
+  var shaking = typeof screenShake !== 'undefined' && screenShake.t > 0;
+  if (shaking) {
+    var k = screenShake.t / 22;
+    var mag = screenShake.mag * S * k;
+    ctx.save();
+    ctx.translate((Math.random() - 0.5) * 2 * mag, (Math.random() - 0.5) * 2 * mag);
+  }
   drawSandImage();
   drawBelt();
   drawGrid();
   drawJumpers();
   drawTrails();
+  if (typeof drawFlyingGrains === 'function') drawFlyingGrains();
+  if (typeof drawSandBombs === 'function') drawSandBombs();
   if (typeof drawParticles === 'function') drawParticles();
+  if (shaking) ctx.restore();
 }
 
 function drawBackground() {
@@ -260,6 +271,11 @@ function drawGrid() {
       }
       if (cell.kind === 'tunnel') {
         drawTunnel(ctx, bx + ox, by, bw, bh, cell, S, tick);
+        continue;
+      }
+      if (cell.kind === 'sandball') {
+        if (cell.used) { drawUsedBucket(bx + ox, by, bw, bh, 0); continue; }
+        drawSandballCell(ctx, bx + ox, by, bw, bh, S, tick, !!cell.active);
         continue;
       }
       if (cell.kind === 'bucket') {

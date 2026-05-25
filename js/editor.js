@@ -568,11 +568,12 @@ function edBuildToolbar() {
   var typeRow = document.createElement('div');
   typeRow.className = 'ed-type-row';
   var types = [
-    { id: 'default', label: 'Bucket' },
-    { id: 'hidden',  label: 'Hidden' },
-    { id: 'tunnel',  label: 'Tunnel' },
-    { id: 'wall',    label: 'Wall' },
-    { id: 'erase',   label: 'Erase' }
+    { id: 'default',  label: 'Bucket' },
+    { id: 'hidden',   label: 'Hidden' },
+    { id: 'sandball', label: 'Sandball' },
+    { id: 'tunnel',   label: 'Tunnel' },
+    { id: 'wall',     label: 'Wall' },
+    { id: 'erase',    label: 'Erase' }
   ];
   types.forEach(function (t) {
     var btn = document.createElement('button');
@@ -645,6 +646,12 @@ function edApplyCellStyle(el, cell) {
     el.innerHTML = '<span class="ed-cell-dot">▦</span>';
     return;
   }
+  if (cell.kind === 'sandball') {
+    el.style.background = 'radial-gradient(circle at 35% 30%,#5a4d52 0%,#1a1418 65%,#050303 100%)';
+    el.style.borderColor = '#000';
+    el.innerHTML = '<span class="ed-cell-dot" style="color:#ffd66b;text-shadow:0 0 6px rgba(255,160,40,0.8)">●</span>';
+    return;
+  }
   if (cell.kind === 'tunnel') {
     el.style.background = 'linear-gradient(135deg,#5A5460,#28232A)';
     el.style.borderColor = '#1A171C';
@@ -679,6 +686,8 @@ function edPaintCell(idx, eraseOverride) {
     edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
+  } else if (edTool === 'sandball') {
+    edLevel.grid[idx] = { kind: 'sandball' };
   } else if (edTool === 'tunnel') {
     var newTunnel = false;
     if (!edLevel.grid[idx] || edLevel.grid[idx].kind !== 'tunnel') {
@@ -980,6 +989,7 @@ function editorTestPlay() {
 function cloneCellForLevel(c) {
   if (!c) return null;
   if (c.kind === 'wall') return { kind: 'wall' };
+  if (c.kind === 'sandball') return { kind: 'sandball' };
   if (c.kind === 'tunnel') {
     return {
       kind: 'tunnel',

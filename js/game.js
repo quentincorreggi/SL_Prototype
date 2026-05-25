@@ -17,6 +17,7 @@ function initGame(levelData) {
   particles = [];
   attractionTrails = [];
   rejectShake = { idx: -1, t: 0 };
+  if (typeof resetSandball === 'function') resetSandball();
   won = false;
   gameActive = true;
   hideWin();
@@ -88,6 +89,7 @@ function computeLevelCapacities() {
 function cloneCell(src) {
   if (!src) return null;
   if (src.kind === 'wall') return { kind: 'wall' };
+  if (src.kind === 'sandball') return { kind: 'sandball', used: false, active: false };
   if (src.kind === 'tunnel') {
     var copy = { kind: 'tunnel', dir: src.dir || 'top', contents: [], spawned: 0 };
     if (src.contents) {
@@ -120,6 +122,7 @@ function isPassable(cell) {
   if (cell.kind === 'wall') return false;
   if (cell.kind === 'tunnel') return true;
   if (cell.kind === 'bucket') return cell.used;
+  if (cell.kind === 'sandball') return cell.used;
   return false;
 }
 
@@ -145,12 +148,14 @@ function updateBucketActivation() {
       if (isPassable(stock[ni])) { visited[ni] = 1; queue.push(ni); }
     }
   }
-  // Mark bucket cells: active iff (in row 0) or (any neighbor visited).
+  // Mark bucket/sandball cells: active iff (in row 0) or (any neighbor visited).
   for (var r = 0; r < GRID_H; r++) {
     for (var c = 0; c < GRID_W; c++) {
       var idx = r * GRID_W + c;
       var cell = stock[idx];
-      if (!cell || cell.kind !== 'bucket' || cell.used) continue;
+      if (!cell) continue;
+      if (cell.kind !== 'bucket' && cell.kind !== 'sandball') continue;
+      if (cell.used) continue;
       var active = false;
       if (r === 0) active = true;
       else if (visited[idx - GRID_W]) active = true;
@@ -221,7 +226,19 @@ function handleTap(sx, sy) {
   if (r < 0 || r >= GRID_H || c < 0 || c >= GRID_W) return;
   var idx = r * GRID_W + c;
   var cell = stock[idx];
-  if (!cell || cell.kind !== 'bucket' || cell.used || !cell.active) return;
+  if (!cell || cell.used || !cell.active) return;
+  if (cell.kind !== 'bucket' && cell.kind !== 'sandball') return;
+
+  // Sand ball: doesn't ride the belt. The cell becomes empty (so paths
+  // reopen for buckets behind it) and a bomb arcs into the sand pile.
+  if (cell.kind === 'sandball') {
+    var from = gridCellCenter(r, c);
+    if (typeof triggerSandball === 'function') triggerSandball(from.x, from.y);
+    stock[idx] = null;
+    updateTunnels();
+    updateBucketActivation();
+    return;
+  }
 
   var slot = firstFreeBeltSlot();
   if (slot < 0) {
@@ -294,6 +311,9 @@ function update() {
   updateBelt();
   updateJumpers();
   updateRejectShake();
+  if (typeof updateSandBombs === 'function') updateSandBombs();
+  if (typeof updateFlyingGrains === 'function') updateFlyingGrains();
+  if (typeof updateScreenShake === 'function') updateScreenShake();
   // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
   if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
   updateBucketAttraction();
@@ -319,6 +339,15 @@ function updateColorDepletion() {
   for (var t = 0; t < attractionTrails.length; t++) {
     hasSand[attractionTrails[t].ci] = true;
   }
+  // Flying grains (mid-explosion) still count as live sand.
+  if (typeof flyingGrains !== 'undefined') {
+    for (var f = 0; f < flyingGrains.length; f++) {
+      hasSand[flyingGrains[f].ci] = true;
+    }
+  }
+  // A pending bomb is about to redistribute sand — don't depopulate buckets
+  // for any colour while one is in flight.
+  if (typeof sandBombs !== 'undefined' && sandBombs.length > 0) return;
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
     if (!b || b.reserved || b.done) continue;
@@ -332,6 +361,8 @@ function checkWin() {
   if (countSandRemaining() !== 0) return;
   if (jumpers.length !== 0) return;
   if (attractionTrails.length !== 0) return;
+  if (typeof sandBombs !== 'undefined' && sandBombs.length !== 0) return;
+  if (typeof flyingGrains !== 'undefined' && flyingGrains.length !== 0) return;
   for (var i = 0; i < BELT_SLOTS; i++) {
     if (beltSlots[i] != null) return;
   }
@@ -391,13 +422,23 @@ function quitGame() {
 function demoLevel() {
   var grid = new Array(GRID_W * GRID_H);
   for (var i = 0; i < grid.length; i++) grid[i] = null;
-  // A small set of buckets on rows 4-6, colors 0..2.
   function placeB(r, c, ci, type) {
     grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
   }
-  placeB(4, 1, 0); placeB(4, 3, 1); placeB(4, 5, 2);
-  placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
-  placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
+  function placeBall(r, c) {
+    grid[r * GRID_W + c] = { kind: 'sandball' };
+  }
+  // Front line: buckets the player can use immediately.
+  placeB(0, 0, 0); placeB(0, 2, 1); placeB(0, 4, 2); placeB(0, 6, 0);
+  placeB(1, 1, 1); placeB(1, 3, 0); placeB(1, 5, 2);
+  // A sand ball sitting front-and-centre as a teaching moment.
+  placeBall(2, 3);
+  // Walls flanking it so the player notices the ball as the unblocking piece.
+  grid[2 * GRID_W + 2] = { kind: 'wall' };
+  grid[2 * GRID_W + 4] = { kind: 'wall' };
+  // Back ranks unlock once the front row clears (or the ball clears them).
+  placeB(3, 1, 2); placeB(3, 3, 1); placeB(3, 5, 0);
+  placeB(4, 0, 1); placeB(4, 2, 2); placeB(4, 4, 0); placeB(4, 6, 1);
 
   // Sand image (32×32): simple horizontal stripes of colors 0..2
   var sand = new Array(IMG_W * IMG_H);
@@ -407,7 +448,7 @@ function demoLevel() {
       sand[y * IMG_W + x] = ci;
     }
   }
-  return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+  return { name: 'Sand Ball Demo', desc: 'Stripes shuffle when the ball pops', grid: grid, sandImage: sand };
 }
 
 // ============================================================

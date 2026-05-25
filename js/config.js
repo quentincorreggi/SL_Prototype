@@ -20,6 +20,8 @@ var audioCtx = null;
 // === LEVEL SYSTEM ===
 var currentLevel = null;
 var LEVELS = [];
+// Prototype showcase — registered later by individual mechanic files.
+// Each entry: { name, desc, grid, sandImage }.
 
 // === GAME OBJECTS ===
 var stock = [];                // 7×7 grid: bucket | tunnel | wall | null
