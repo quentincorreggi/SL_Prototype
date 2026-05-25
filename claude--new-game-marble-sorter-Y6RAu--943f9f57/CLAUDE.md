@@ -245,11 +245,38 @@ grid effects):
 - **Belt slots:** 5
 - **Belt direction:** right → left (slots exiting right re-enter on left)
 - **Belt speed:** one slot-width per ~1.5 seconds
-- **Bucket capacity:** 12 grains
 - **Bucket attraction radius:** 8 sand-cells (~¼ image width)
 - **Attraction pull rate:** 1 grain every 6 frames (~10/sec at 60fps)
 - **Sand physics:** full cellular automaton — each frame, every grain tries
   down, then down-left, then down-right
+
+## Bucket capacity rule (important)
+
+Bucket capacity is **not a constant** — it's derived per-color per-level:
+
+```
+capacity[ci] = ceil(totalSandOfColor[ci] / totalBucketsOfColor[ci])
+```
+
+Total bucket capacity therefore always matches (or slightly exceeds, via the
+ceiling) the sand of that color. Buckets stored inside tunnels count toward
+the bucket total for their color.
+
+Constraints enforced by the editor:
+
+- Every color present in the sand image must have at least one bucket placed
+  somewhere (grid or tunnel contents). Test Play is blocked otherwise.
+- The bucket-grid toolbar only offers colors that appear in the sand image —
+  paint sand first, then choose bucket colors.
+
+Runtime safety net (in `game.js`): if a color's sand is exhausted while a
+bucket of that color still sits on the belt, the bucket is auto-popped (the
+last bucket of a color naturally fills partially when totals don't divide
+evenly).
+
+Capacities are computed once at `initGame` time and stored in the global
+`levelCapacities[ci]`. Each belt-bucket carries its own `.capacity` field
+copied from this array at creation, so prototypes can override per-bucket.
 
 ## Prototyping Workflow
 

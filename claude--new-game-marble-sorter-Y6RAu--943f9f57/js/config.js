@@ -39,7 +39,11 @@ var BELT_SPEED = 0.011;        // slot-fractions per frame (one slot per ~1.5s a
 var beltOffset = 0;            // 0..1 — fraction of a slot scrolled left
 
 // === BUCKETS ===
-var BUCKET_CAPACITY = 12;
+// Bucket capacity is per-color and per-level: ceil(sandOfColor / bucketsOfColor).
+// `levelCapacities[ci]` is recomputed at every initGame; belt buckets get
+// their own `.capacity` field at creation. There is no global capacity const.
+var levelCapacities = new Array(NUM_COLORS);
+for (var __ci = 0; __ci < NUM_COLORS; __ci++) levelCapacities[__ci] = 0;
 var ATTRACT_RADIUS_CELLS = 8;  // sand-cell units
 var ATTRACT_PULL_FRAMES = 6;   // pull one grain every N frames per bucket
 var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
