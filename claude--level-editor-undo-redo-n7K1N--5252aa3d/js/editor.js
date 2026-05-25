@@ -20,7 +20,7 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(SAND_W * SAND_H)
+  sandImage: new Array(IMG_W * IMG_H)
 };
 
 // --- Bucket-grid state ---
@@ -198,7 +198,7 @@ function edRenderCapacities() {
     if (stats.sand[ci] === 0 && stats.bkt[ci] === 0) continue;
     anyVisible = true;
     var c = COLORS[ci];
-    var s = stats.sand[ci] * (SAND_DENSITY || 1), b = stats.bkt[ci];
+    var s = stats.sand[ci] * (SAND_SUBDIV * SAND_SUBDIV || 1), b = stats.bkt[ci];
     var cap = (s > 0 && b > 0) ? Math.ceil(s / b) : 0;
     var chip = document.createElement('div');
     chip.className = 'ed-cap-chip';
@@ -331,7 +331,7 @@ function edBuildSandGrid() {
   if (!g) return;
   g.innerHTML = '';
   edSandCells = [];
-  for (var i = 0; i < SAND_W * SAND_H; i++) {
+  for (var i = 0; i < IMG_W * IMG_H; i++) {
     var px = document.createElement('div');
     px.className = 'ed-sand-px';
     edApplySandCell(px, edLevel.sandImage[i]);
@@ -364,11 +364,11 @@ function pointerToSandCell(e) {
   var g = document.getElementById('ed-sand-grid');
   if (!g) return null;
   var rect = g.getBoundingClientRect();
-  var cellW = rect.width / SAND_W;
-  var cellH = rect.height / SAND_H;
+  var cellW = rect.width / IMG_W;
+  var cellH = rect.height / IMG_H;
   var x = Math.floor((e.clientX - rect.left) / cellW);
   var y = Math.floor((e.clientY - rect.top) / cellH);
-  if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) return null;
+  if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) return null;
   return { x: x, y: y };
 }
 
@@ -477,8 +477,8 @@ function paintBrush(cx, cy, ci, size) {
   for (var dy = -halfL; dy <= halfR; dy++) {
     for (var dx = -halfL; dx <= halfR; dx++) {
       var x = cx + dx, y = cy + dy;
-      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-        edLevel.sandImage[y * SAND_W + x] = ci;
+      if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+        edLevel.sandImage[y * IMG_W + x] = ci;
       }
     }
   }
@@ -501,15 +501,15 @@ function paintLine(x0, y0, x1, y1, ci, size) {
 
 // 4-connected flood fill
 function floodFill(sx, sy, ci) {
-  if (sx < 0 || sx >= SAND_W || sy < 0 || sy >= SAND_H) return;
-  var target = edLevel.sandImage[sy * SAND_W + sx];
+  if (sx < 0 || sx >= IMG_W || sy < 0 || sy >= IMG_H) return;
+  var target = edLevel.sandImage[sy * IMG_W + sx];
   if (target === ci) return;
   var stack = [[sx, sy]];
   while (stack.length > 0) {
     var p = stack.pop();
     var x = p[0], y = p[1];
-    if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) continue;
-    var i = y * SAND_W + x;
+    if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) continue;
+    var i = y * IMG_W + x;
     if (edLevel.sandImage[i] !== target) continue;
     edLevel.sandImage[i] = ci;
     stack.push([x + 1, y]);
@@ -524,8 +524,8 @@ function drawRectShape(x0, y0, x1, y1, ci) {
   var minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
   for (var y = minY; y <= maxY; y++) {
     for (var x = minX; x <= maxX; x++) {
-      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-        edLevel.sandImage[y * SAND_W + x] = ci;
+      if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+        edLevel.sandImage[y * IMG_W + x] = ci;
       }
     }
   }
@@ -543,8 +543,8 @@ function drawEllipseShape(x0, y0, x1, y1, ci) {
       var dx = (x - cx) / rx;
       var dy = (y - cy) / ry;
       if (dx * dx + dy * dy <= 1.0) {
-        if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-          edLevel.sandImage[y * SAND_W + x] = ci;
+        if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+          edLevel.sandImage[y * IMG_W + x] = ci;
         }
       }
     }
@@ -805,10 +805,10 @@ function edClearAll() {
 function edRandomSand() {
   var palette = edAvailableColors();
   if (palette.length === 0) palette = [0, 1, 2];
-  for (var y = 0; y < SAND_H; y++) {
-    var ci = palette[(y * palette.length / SAND_H) | 0];
-    for (var x = 0; x < SAND_W; x++) {
-      edLevel.sandImage[y * SAND_W + x] = ci;
+  for (var y = 0; y < IMG_H; y++) {
+    var ci = palette[(y * palette.length / IMG_H) | 0];
+    for (var x = 0; x < IMG_W; x++) {
+      edLevel.sandImage[y * IMG_W + x] = ci;
     }
   }
   edRefreshSandGrid();
@@ -904,8 +904,8 @@ function editorImportJSON() {
     edLevel.desc = data.desc || '';
     edLevel.grid = (data.grid || []).slice(0, GRID_W * GRID_H);
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
-    edLevel.sandImage = (data.sandImage || []).slice(0, SAND_W * SAND_H);
-    while (edLevel.sandImage.length < SAND_W * SAND_H) edLevel.sandImage.push(-1);
+    edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
+    while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();

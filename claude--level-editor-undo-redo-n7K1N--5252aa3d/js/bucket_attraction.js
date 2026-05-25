@@ -27,7 +27,10 @@ function updateBucketAttraction() {
     if ((b.fill || 0) + enRoute >= b.capacity) continue;
 
     var sp = getBeltSlotSandPos(i);
-    var grain = findNearestGrain(sp.x, sp.y, b.ci, ATTRACT_RADIUS_CELLS);
+    // ATTRACT_RADIUS_CELLS is in image-pixel units; scale to actual sand
+    // cells so the physical reach stays consistent across subdivisions.
+    var radius = ATTRACT_RADIUS_CELLS * SAND_SUBDIV;
+    var grain = findNearestGrain(sp.x, sp.y, b.ci, radius);
     if (!grain) continue;
 
     extractGrain(grain.x, grain.y);
@@ -56,7 +59,9 @@ function updateAttractionTrails() {
     var t = attractionTrails[i];
     t.t++;
     if (t.t >= t.dur) {
-      // Arrival: credit only if the bucket still occupies the slot.
+      // Arrival: credit only if the bucket still occupies the slot and
+      // still has capacity. Otherwise the grain is silently dropped —
+      // it was already extracted from the image and should never re-appear.
       var slot = t.slot;
       var b = beltSlots[slot];
       if (b && b === t.bucketRef && !b.done) {
@@ -64,25 +69,8 @@ function updateAttractionTrails() {
         if (b.capacity > 0 && b.fill >= b.capacity) {
           b.done = true;
         }
-      } else {
-        // Bucket gone — return the grain so it isn't lost (drop at a random
-        // empty cell near the top so it falls naturally back into place).
-        // This is rare in practice (only if user pops the source bucket
-        // mid-flight); keeping it for fairness.
-        returnGrainToImage(t.ci);
       }
       attractionTrails.splice(i, 1);
-    }
-  }
-}
-
-function returnGrainToImage(ci) {
-  for (var tries = 0; tries < 32; tries++) {
-    var x = ~~(Math.random() * SAND_W);
-    var y = ~~(Math.random() * 4);
-    if (sandGrid[sandIdx(x, y)] < 0) {
-      sandGrid[sandIdx(x, y)] = ci;
-      return;
     }
   }
 }

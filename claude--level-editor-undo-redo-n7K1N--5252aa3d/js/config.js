@@ -30,13 +30,14 @@ var attractionTrails = [];     // animated grain → bucket trails
 var belowReveals = [];         // hidden-bucket reveal animations (on belt landing)
 
 // === SAND IMAGE ===
-var SAND_W = 32, SAND_H = 32;
+// IMG_W/IMG_H — fixed 32×32 image (editor paints at this resolution).
+// SAND_W/SAND_H — runtime sand grid; subdivided so each image pixel
+// expands into a SAND_SUBDIV × SAND_SUBDIV block of real sand cells
+// that fall via the CA independently. Resized at initGame.
+var IMG_W = 32, IMG_H = 32;
+var SAND_SUBDIV = 1;
+var SAND_W = IMG_W * SAND_SUBDIV, SAND_H = IMG_H * SAND_SUBDIV;
 var sandGrid = new Int8Array(SAND_W * SAND_H);   // color index 0..NUM_COLORS-1, or -1 for empty
-// Each painted image-pixel holds SAND_DENSITY particles. Bucket pulls
-// decrement sandDensity[i]; when it hits 0, sandGrid[i] becomes -1 (empty)
-// and sand above falls into it. Tunable via the debug sliders.
-var SAND_DENSITY = 1;
-var sandDensity = new Int16Array(SAND_W * SAND_H);
 
 // === BELT ===
 var BELT_SLOTS = 5;
@@ -126,5 +127,4 @@ function gridIdx(r, c) { return r * GRID_W + c; }
 
 (function clearSandGridOnLoad() {
   for (var i = 0; i < sandGrid.length; i++) sandGrid[i] = -1;
-  for (var j = 0; j < sandDensity.length; j++) sandDensity[j] = 0;
 })();
