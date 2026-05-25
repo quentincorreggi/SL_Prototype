@@ -326,11 +326,18 @@ function hideWin() {
 
 function showLevelSelect() {
   hideWin();
+  gameActive = false;
+  // If we got here from Test Play, return to the editor with state intact.
+  if (typeof edPlayingFromEditor !== 'undefined' && edPlayingFromEditor) {
+    edPlayingFromEditor = false;
+    var ed = document.getElementById('editor-screen');
+    if (ed) ed.classList.remove('hidden');
+    return;
+  }
   var ls = document.getElementById('level-screen');
   var ed = document.getElementById('editor-screen');
   if (ls) ls.classList.remove('hidden');
   if (ed) ed.classList.add('hidden');
-  gameActive = false;
 }
 
 // ============================================================
