@@ -232,7 +232,7 @@
   <div class="cal-row">
     <label>Bucket radius <span class="v" id="cal-radius-v">8</span></label>
     <input id="cal-radius" type="range" min="1" max="20" step="1" value="8">
-    <div class="hint">Attraction range (sand cells).</div>
+    <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
   </div>
   <div class="cal-row">
     <label>Pull interval <span class="v" id="cal-pull-v">6</span></label>
@@ -240,9 +240,9 @@
     <div class="hint">Frames between grain pulls. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
   </div>
   <div class="cal-row">
-    <label>Particles per pixel <span class="v" id="cal-density-v">1</span></label>
-    <input id="cal-density" type="range" min="1" max="10" step="1" value="1">
-    <div class="hint">How many sand particles each image pixel holds. Applied on next game start.</div>
+    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">1&times;1</span></label>
+    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="1">
+    <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
   </div>
 </div>
 

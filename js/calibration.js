@@ -54,7 +54,19 @@ function hookGlobalSlider(id, globalName, onChange) {
 (function bindDebugSliders() {
   hookGlobalSlider('cal-radius',  'ATTRACT_RADIUS_CELLS');
   hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
-  hookGlobalSlider('cal-density', 'SAND_DENSITY', function () {
-    if (typeof edRefreshLiveSections === 'function') edRefreshLiveSections();
-  });
+  // Subdivision slider — display as "N×N" and refresh the editor's
+  // capacity totals (each pixel becomes N² grains).
+  var subEl = document.getElementById('cal-subdiv');
+  var subVal = document.getElementById('cal-subdiv-v');
+  if (subEl) {
+    var cur = SAND_SUBDIV || 1;
+    subEl.value = cur;
+    if (subVal) subVal.textContent = cur + '×' + cur;
+    subEl.addEventListener('input', function () {
+      var v = parseInt(subEl.value, 10) || 1;
+      SAND_SUBDIV = v;
+      if (subVal) subVal.textContent = v + '×' + v;
+      if (typeof edRefreshLiveSections === 'function') edRefreshLiveSections();
+    });
+  }
 })();
