@@ -25,7 +25,9 @@ function updateSand() {
       var below = sandIdx(x, y + 1);
       if (sandGrid[below] < 0) {
         sandGrid[below] = ci;
+        sandDensity[below] = sandDensity[idx];
         sandGrid[idx] = -1;
+        sandDensity[idx] = 0;
         continue;
       }
 
@@ -36,10 +38,14 @@ function updateSand() {
 
       if (firstDir >= 0 && sandGrid[firstDir] < 0) {
         sandGrid[firstDir] = ci;
+        sandDensity[firstDir] = sandDensity[idx];
         sandGrid[idx] = -1;
+        sandDensity[idx] = 0;
       } else if (secondDir >= 0 && sandGrid[secondDir] < 0) {
         sandGrid[secondDir] = ci;
+        sandDensity[secondDir] = sandDensity[idx];
         sandGrid[idx] = -1;
+        sandDensity[idx] = 0;
       }
     }
   }
@@ -50,7 +56,12 @@ function extractGrain(x, y) {
   var i = sandIdx(x, y);
   var ci = sandGrid[i];
   if (ci < 0) return -1;
-  sandGrid[i] = -1;
+  if (sandDensity[i] > 1) {
+    sandDensity[i]--;
+  } else {
+    sandDensity[i] = 0;
+    sandGrid[i] = -1;
+  }
   return ci;
 }
 
@@ -79,23 +90,29 @@ function findNearestGrain(cx, cy, ci, maxR) {
 
 function paintGrain(x, y, ci) {
   if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) return;
-  sandGrid[sandIdx(x, y)] = ci;
+  var i = sandIdx(x, y);
+  sandGrid[i] = ci;
+  sandDensity[i] = ci < 0 ? 0 : SAND_DENSITY;
 }
 
 function countSandRemaining() {
   var n = 0;
-  for (var i = 0; i < sandGrid.length; i++) if (sandGrid[i] >= 0) n++;
+  for (var i = 0; i < sandGrid.length; i++) {
+    if (sandGrid[i] >= 0) n += sandDensity[i];
+  }
   return n;
 }
 
 function countSandOfColor(ci) {
   var n = 0;
-  for (var i = 0; i < sandGrid.length; i++) if (sandGrid[i] === ci) n++;
+  for (var i = 0; i < sandGrid.length; i++) {
+    if (sandGrid[i] === ci) n += sandDensity[i];
+  }
   return n;
 }
 
 function clearSandGrid() {
-  for (var i = 0; i < sandGrid.length; i++) sandGrid[i] = -1;
+  for (var i = 0; i < sandGrid.length; i++) { sandGrid[i] = -1; sandDensity[i] = 0; }
 }
 
 // Convert canvas-space (cx, cy) → sand-cell coords. Returns null if outside.

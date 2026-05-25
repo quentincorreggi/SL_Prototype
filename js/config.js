@@ -32,6 +32,11 @@ var belowReveals = [];         // hidden-bucket reveal animations (on belt landi
 // === SAND IMAGE ===
 var SAND_W = 32, SAND_H = 32;
 var sandGrid = new Int8Array(SAND_W * SAND_H);   // color index 0..NUM_COLORS-1, or -1 for empty
+// Each painted image-pixel holds SAND_DENSITY particles. Bucket pulls
+// decrement sandDensity[i]; when it hits 0, sandGrid[i] becomes -1 (empty)
+// and sand above falls into it. Tunable via the debug sliders.
+var SAND_DENSITY = 1;
+var sandDensity = new Int16Array(SAND_W * SAND_H);
 
 // === BELT ===
 var BELT_SLOTS = 5;
@@ -121,4 +126,5 @@ function gridIdx(r, c) { return r * GRID_W + c; }
 
 (function clearSandGridOnLoad() {
   for (var i = 0; i < sandGrid.length; i++) sandGrid[i] = -1;
+  for (var j = 0; j < sandDensity.length; j++) sandDensity[j] = 0;
 })();

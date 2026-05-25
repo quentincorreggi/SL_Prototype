@@ -32,4 +32,29 @@ function hookCal(id, obj, key, factor) {
   });
 }
 
-// Future: bind sliders for cal.image, cal.belt, cal.grid here.
+// Hook a slider to a top-level numeric global (read by name from window).
+function hookGlobalSlider(id, globalName, onChange) {
+  var el = document.getElementById(id);
+  var valEl = document.getElementById(id + '-v');
+  if (!el) return;
+  // Initialize slider to current global value.
+  var cur = window[globalName];
+  if (cur != null) {
+    el.value = cur;
+    if (valEl) valEl.textContent = cur;
+  }
+  el.addEventListener('input', function () {
+    var v = parseFloat(el.value);
+    window[globalName] = v;
+    if (valEl) valEl.textContent = el.value;
+    if (typeof onChange === 'function') onChange(v);
+  });
+}
+
+(function bindDebugSliders() {
+  hookGlobalSlider('cal-radius',  'ATTRACT_RADIUS_CELLS');
+  hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
+  hookGlobalSlider('cal-density', 'SAND_DENSITY', function () {
+    if (typeof edRefreshLiveSections === 'function') edRefreshLiveSections();
+  });
+})();

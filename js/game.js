@@ -28,17 +28,20 @@ function initGame(levelData) {
     }
   }
 
-  // Sand image
-  for (var s = 0; s < sandGrid.length; s++) sandGrid[s] = -1;
+  // Sand image — expand each painted image-pixel into SAND_DENSITY particles.
+  for (var s = 0; s < sandGrid.length; s++) { sandGrid[s] = -1; sandDensity[s] = 0; }
   if (lvl.sandImage) {
     for (var i = 0; i < Math.min(sandGrid.length, lvl.sandImage.length); i++) {
-      sandGrid[i] = lvl.sandImage[i];
+      var ci = lvl.sandImage[i];
+      sandGrid[i] = ci;
+      sandDensity[i] = ci >= 0 ? SAND_DENSITY : 0;
     }
   }
 
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
   updateBucketActivation();
+  showQuitBtn();
 }
 
 function computeLevelCapacities() {
@@ -47,7 +50,7 @@ function computeLevelCapacities() {
   for (var ci = 0; ci < NUM_COLORS; ci++) { sandPer[ci] = 0; bktPer[ci] = 0; }
   for (var i = 0; i < sandGrid.length; i++) {
     var c = sandGrid[i];
-    if (c >= 0 && c < NUM_COLORS) sandPer[c]++;
+    if (c >= 0 && c < NUM_COLORS) sandPer[c] += sandDensity[i];
   }
   for (var i = 0; i < stock.length; i++) {
     var cell = stock[i];
@@ -327,6 +330,7 @@ function hideWin() {
 function showLevelSelect() {
   hideWin();
   gameActive = false;
+  hideQuitBtn();
   // If we got here from Test Play, return to the editor with state intact.
   if (typeof edPlayingFromEditor !== 'undefined' && edPlayingFromEditor) {
     edPlayingFromEditor = false;
@@ -338,6 +342,18 @@ function showLevelSelect() {
   var ed = document.getElementById('editor-screen');
   if (ls) ls.classList.remove('hidden');
   if (ed) ed.classList.add('hidden');
+}
+
+function showQuitBtn() {
+  var b = document.getElementById('quit-btn');
+  if (b) b.style.display = 'flex';
+}
+function hideQuitBtn() {
+  var b = document.getElementById('quit-btn');
+  if (b) b.style.display = 'none';
+}
+function quitGame() {
+  showLevelSelect();
 }
 
 // ============================================================

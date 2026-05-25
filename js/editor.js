@@ -45,6 +45,11 @@ var edSnapshot = null;      // sandImage array snapshot at drag start (for shape
 var edInitialized = false;
 var edPlayingFromEditor = false;
 
+// --- Undo/redo stack (full level snapshots) ---
+var edHistory = [];
+var edHistoryIdx = -1;
+var ED_HISTORY_LIMIT = 80;
+
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
@@ -55,7 +60,90 @@ function edInit() {
   edBindSandPointer();
   edRefreshLiveSections();
   edHideTunnelPanel();
+  edHistory = [];
+  edHistoryIdx = -1;
+  edPushHistory();
 }
+
+// ============================================================
+// Undo / Redo — full snapshot per discrete edit (stroke, cell, etc.)
+// ============================================================
+
+function edSnapshotState() {
+  return {
+    name: edLevel.name,
+    desc: edLevel.desc,
+    grid: edLevel.grid.map(cloneCellForLevel),
+    sandImage: edLevel.sandImage.slice()
+  };
+}
+
+function edPushHistory() {
+  // Truncate any redo branch
+  if (edHistoryIdx < edHistory.length - 1) {
+    edHistory.length = edHistoryIdx + 1;
+  }
+  edHistory.push(edSnapshotState());
+  if (edHistory.length > ED_HISTORY_LIMIT) {
+    edHistory.shift();
+  }
+  edHistoryIdx = edHistory.length - 1;
+}
+
+function edRestoreState(s) {
+  edLevel.name = s.name;
+  edLevel.desc = s.desc;
+  edLevel.grid = s.grid.map(cloneCellForLevel);
+  edLevel.sandImage = s.sandImage.slice();
+  // Cancel any in-progress drag so a subsequent move event won't restore
+  // the pre-drag snapshot over the just-restored state.
+  edDragging = false;
+  edDragMode = null;
+  edDragStart = null;
+  edDragLast = null;
+  edSnapshot = null;
+  var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
+  var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
+  edRefreshSandGrid();
+  edBuildGrid();
+  edBuildToolbar();
+  edSelectedTunnel = -1;
+  edHideTunnelPanel();
+  edRefreshLiveSections();
+}
+
+function edUndo() {
+  if (edHistoryIdx <= 0) return;
+  edHistoryIdx--;
+  edRestoreState(edHistory[edHistoryIdx]);
+  edToast('Undo');
+}
+
+function edRedo() {
+  if (edHistoryIdx >= edHistory.length - 1) return;
+  edHistoryIdx++;
+  edRestoreState(edHistory[edHistoryIdx]);
+  edToast('Redo');
+}
+
+(function bindEditorShortcuts() {
+  document.addEventListener('keydown', function (e) {
+    var ed = document.getElementById('editor-screen');
+    if (!ed || ed.classList.contains('hidden')) return;
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    var meta = e.ctrlKey || e.metaKey;
+    if (!meta) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) edRedo(); else edUndo();
+    } else if (k === 'y') {
+      e.preventDefault();
+      edRedo();
+    }
+  });
+})();
 
 // ============================================================
 // Counts / capacities / validation
@@ -110,7 +198,7 @@ function edRenderCapacities() {
     if (stats.sand[ci] === 0 && stats.bkt[ci] === 0) continue;
     anyVisible = true;
     var c = COLORS[ci];
-    var s = stats.sand[ci], b = stats.bkt[ci];
+    var s = stats.sand[ci] * (SAND_DENSITY || 1), b = stats.bkt[ci];
     var cap = (s > 0 && b > 0) ? Math.ceil(s / b) : 0;
     var chip = document.createElement('div');
     chip.className = 'ed-cap-chip';
@@ -318,6 +406,7 @@ function onSandPointerDown(e) {
     edRefreshSandGrid();
     edDragging = false; // single-shot
     edOnSandChanged();
+    edPushHistory();
     return;
   }
   if (mode === 'brush' || mode === 'eraser') {
@@ -375,6 +464,7 @@ function onSandPointerUp(e) {
   edDragLast = null;
   edSnapshot = null;
   edOnSandChanged();
+  edPushHistory();
 }
 
 // ============================================================
@@ -590,19 +680,23 @@ function edPaintCell(idx, eraseOverride) {
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
   } else if (edTool === 'tunnel') {
+    var newTunnel = false;
     if (!edLevel.grid[idx] || edLevel.grid[idx].kind !== 'tunnel') {
       edLevel.grid[idx] = { kind: 'tunnel', dir: 'top', contents: [] };
+      newTunnel = true;
     }
     edSelectedTunnel = idx;
     edBuildGrid();
     edRefreshLiveSections();
     edShowTunnelPanel(idx);
+    if (newTunnel) edPushHistory();
     return;
   }
   edSelectedTunnel = -1;
   edHideTunnelPanel();
   edBuildGrid();
   edRefreshLiveSections();
+  edPushHistory();
 }
 
 // ============================================================
@@ -629,7 +723,7 @@ function edShowTunnelPanel(idx) {
     var btn = document.createElement('button');
     btn.className = 'ed-tunnel-dir-btn' + (t.dir === d ? ' active' : '');
     btn.textContent = d[0].toUpperCase() + d.slice(1);
-    btn.onclick = function () { t.dir = d; edShowTunnelPanel(idx); edBuildGrid(); };
+    btn.onclick = function () { t.dir = d; edShowTunnelPanel(idx); edBuildGrid(); edPushHistory(); };
     dirRow.appendChild(btn);
   });
   panel.appendChild(dirRow);
@@ -650,7 +744,7 @@ function edShowTunnelPanel(idx) {
       : 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
     btn.textContent = item.type === 'hidden' ? '?' : '';
     btn.title = CLR_NAMES[item.ci] + ' — click to remove';
-    btn.onclick = function () { t.contents.splice(i, 1); edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); };
+    btn.onclick = function () { t.contents.splice(i, 1); edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); edPushHistory(); };
     contentsList.appendChild(btn);
   });
   panel.appendChild(contentsList);
@@ -680,7 +774,7 @@ function edShowTunnelPanel(idx) {
       btn.onclick = function () {
         if (!t.contents) t.contents = [];
         t.contents.push({ type: type, ci: ci });
-        edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections();
+        edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); edPushHistory();
       };
       row.appendChild(btn);
     });
@@ -705,6 +799,7 @@ function edClearAll() {
   edRefreshSandGrid();
   edBuildToolbar();
   edRefreshLiveSections();
+  edPushHistory();
 }
 
 function edRandomSand() {
@@ -718,6 +813,7 @@ function edRandomSand() {
   }
   edRefreshSandGrid();
   edOnSandChanged();
+  edPushHistory();
 }
 
 // ============================================================
@@ -818,6 +914,7 @@ function editorImportJSON() {
     edRefreshLiveSections();
     ta.style.display = 'none';
     edToast('Imported.');
+    edPushHistory();
   } catch (e) {
     edToast('Invalid JSON.');
   }
