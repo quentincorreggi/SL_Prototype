@@ -186,10 +186,11 @@ Parameters:
 2. If yes: bucket flies onto the next free slot (animated jump).
 3. The grid cell becomes `used=true`.
 4. `updateBucketActivation()` re-evaluates every cell's active state — a bucket
-   is active iff there is a path of passable cells (empty slots or used-up
-   buckets) from its position upward to the top edge of the grid (where the
-   grid meets the belt). Walls, active buckets, and tunnels (depleted or full)
-   block the path. Buckets whose path just opened become active.
+   is active iff there is a path of passable cells (empty slots, used-up
+   buckets, or tunnels) from its position upward to the top edge of the grid
+   (where the grid meets the belt). Walls and other active/inactive buckets
+   block the path. Tunnels are pass-through regardless of contents. Buckets
+   whose path just opened become active.
 
 #### Level Data Format
 

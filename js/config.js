@@ -18,34 +18,38 @@ var gameActive = false;
 var audioCtx = null;
 
 // === LEVEL SYSTEM ===
-var currentLevel = 0;
+var currentLevel = null;
 var LEVELS = [];
 
 // === GAME OBJECTS ===
 var stock = [];                // 7×7 grid: bucket | tunnel | wall | null
-var beltSlots = [];            // 5 slots on the belt; each null or a bucket-on-belt object
-var jumpers = [];              // buckets animating from grid → belt
+var beltSlots = [];            // 5 slots on the belt; each null or a bucket-on-belt
+var jumpers = [];              // buckets animating grid → belt
 var particles = [];            // visual effects
 var attractionTrails = [];     // animated grain → bucket trails
+var belowReveals = [];         // hidden-bucket reveal animations (on belt landing)
 
 // === SAND IMAGE ===
 var SAND_W = 32, SAND_H = 32;
 var sandGrid = new Int8Array(SAND_W * SAND_H);   // color index 0..NUM_COLORS-1, or -1 for empty
-var sandFalling = [];          // grains mid-fall (CA settles them frame-by-frame)
 
 // === BELT ===
 var BELT_SLOTS = 5;
-var BELT_SPEED = 0.0011;       // one slot-width per ~1.5s at 60fps (slot-fraction per frame)
-var beltOffset = 0;            // 0..1 — fraction of a slot scrolled; belt moves right→left, so
-                               // when offset crosses 1 the contents shift one slot leftward
+var BELT_SPEED = 0.011;        // slot-fractions per frame (one slot per ~1.5s at 60fps)
+var beltOffset = 0;            // 0..1 — fraction of a slot scrolled left
 
 // === BUCKETS ===
 var BUCKET_CAPACITY = 12;
-var ATTRACT_RADIUS_CELLS = 8;  // measured in sand-cells (each cell ≈ sand-image-width / 32)
-var ATTRACT_PULL_FRAMES = 6;   // pull one grain every N frames (per bucket)
+var ATTRACT_RADIUS_CELLS = 8;  // sand-cell units
+var ATTRACT_PULL_FRAMES = 6;   // pull one grain every N frames per bucket
+var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
+var BUCKET_POP_FRAMES = 18;    // duration of pop animation
+var JUMPER_FRAMES = 24;        // duration of grid→belt arc
+
+// === GRID ===
+var GRID_W = 7, GRID_H = 7;
 
 // === COLOR PALETTE (sand + buckets share the palette) ===
-// 7 colors is the max for a level; index -1 in sandGrid means empty.
 var CLR_NAMES = ['pink', 'blue', 'green', 'yellow', 'purple', 'orange', 'teal'];
 var COLORS = [
   { fill: '#FF4E8C', light: '#FF85B5', dark: '#C73068', glow: 'rgba(255,78,140,0.5)' },
@@ -58,13 +62,15 @@ var COLORS = [
 ];
 var NUM_COLORS = COLORS.length;
 
-// === CALIBRATION ===
-// Tunable offsets; sliders in the calibration panel write to this.
+// === CALIBRATION (placeholders; sliders may bind later) ===
 var cal = {
   image:  { dx: 0, dy: 0, s: 1.0 },
   belt:   { dx: 0, dy: 0, sw: 1.0, sh: 1.0 },
   grid:   { dx: 0, dy: 0, s: 1.0 }
 };
+
+// === BELT-OVERFLOW SHAKE (feedback when user taps with no free slot) ===
+var rejectShake = { idx: -1, t: 0 };
 
 // === HELPERS ===
 function shuffle(arr) {
@@ -75,8 +81,8 @@ function shuffle(arr) {
 }
 
 function sandIdx(x, y) { return y * SAND_W + x; }
+function gridIdx(r, c) { return r * GRID_W + c; }
 
-// Initialize the sand grid to empty.
-(function clearSandGrid() {
+(function clearSandGridOnLoad() {
   for (var i = 0; i < sandGrid.length; i++) sandGrid[i] = -1;
 })();

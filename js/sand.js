@@ -1,30 +1,48 @@
 // ============================================================
-// sand.js — Sand image storage + falling-sand cellular automaton
+// sand.js — 32×32 sand image + falling-sand cellular automaton
 // ============================================================
 //
-// The 32×32 sand image is stored as `sandGrid` (Int8Array) in config.js.
-// Each cell holds a color index (0..NUM_COLORS-1) or -1 for empty.
+// Stored in `sandGrid` (Int8Array). Each cell holds a color index
+// (0..NUM_COLORS-1) or -1 for empty.
 //
-// This file owns:
-//   - updateSand()       — one tick of CA physics (down, down-left, down-right)
-//   - extractGrain(x, y) — remove a grain at (x, y); returns color index or -1
-//   - findNearestGrain(cx, cy, ci, maxR) — find nearest sand cell of color ci
-//                                          within radius maxR from belt-relative
-//                                          point (cx, cy). Returns {x, y} or null.
-//   - paintGrain(x, y, ci) — used by the editor to author the image
-//
-// CA RULES:
-//   For each cell (scanned bottom-up so falling doesn't cascade in one frame):
-//     - if cell below is empty → swap down
-//     - else if down-left is empty → swap down-left
-//     - else if down-right is empty → swap down-right
-//
-// NOTE: This file is a SCAFFOLDING STUB. The first prototype branch will
-// implement the CA loop and the extraction helpers.
+// CA RULES (each frame, iterate bottom-up):
+//   For each grain at (x, y):
+//     - if cell below empty → swap down
+//     - else if diagonal down (alternating L/R based on parity) empty → swap
+//     - else stay
+//   Iteration alternates L→R / R→L per row to avoid bias.
 // ============================================================
 
 function updateSand() {
-  // TODO: cellular automaton step — implemented in first prototype.
+  for (var y = SAND_H - 2; y >= 0; y--) {
+    var leftFirst = ((tick + y) & 1) === 0;
+    for (var ii = 0; ii < SAND_W; ii++) {
+      var x = leftFirst ? ii : (SAND_W - 1 - ii);
+      var idx = sandIdx(x, y);
+      var ci = sandGrid[idx];
+      if (ci < 0) continue;
+
+      var below = sandIdx(x, y + 1);
+      if (sandGrid[below] < 0) {
+        sandGrid[below] = ci;
+        sandGrid[idx] = -1;
+        continue;
+      }
+
+      var dl = (x > 0) ? sandIdx(x - 1, y + 1) : -1;
+      var dr = (x < SAND_W - 1) ? sandIdx(x + 1, y + 1) : -1;
+      var firstDir = leftFirst ? dl : dr;
+      var secondDir = leftFirst ? dr : dl;
+
+      if (firstDir >= 0 && sandGrid[firstDir] < 0) {
+        sandGrid[firstDir] = ci;
+        sandGrid[idx] = -1;
+      } else if (secondDir >= 0 && sandGrid[secondDir] < 0) {
+        sandGrid[secondDir] = ci;
+        sandGrid[idx] = -1;
+      }
+    }
+  }
 }
 
 function extractGrain(x, y) {
@@ -36,9 +54,9 @@ function extractGrain(x, y) {
   return ci;
 }
 
+// Find the nearest grain of color ci within `maxR` sand-cells of (cx, cy).
+// (cx, cy) and maxR are in sand-cell units. Returns {x, y, dist} or null.
 function findNearestGrain(cx, cy, ci, maxR) {
-  // Returns {x, y, dist} or null. Scans cells within `maxR` of (cx, cy).
-  // TODO: optimize with spatial index if needed; brute-force is fine for 32×32.
   var bestX = -1, bestY = -1, bestD2 = maxR * maxR + 1;
   var minX = Math.max(0, Math.floor(cx - maxR));
   var maxX = Math.min(SAND_W - 1, Math.ceil(cx + maxR));
@@ -68,4 +86,23 @@ function countSandRemaining() {
   var n = 0;
   for (var i = 0; i < sandGrid.length; i++) if (sandGrid[i] >= 0) n++;
   return n;
+}
+
+function countSandOfColor(ci) {
+  var n = 0;
+  for (var i = 0; i < sandGrid.length; i++) if (sandGrid[i] === ci) n++;
+  return n;
+}
+
+function clearSandGrid() {
+  for (var i = 0; i < sandGrid.length; i++) sandGrid[i] = -1;
+}
+
+// Convert canvas-space (cx, cy) → sand-cell coords. Returns null if outside.
+function sandCellAt(cx, cy) {
+  if (!L.image) return null;
+  var sx = (cx - L.image.x) / L.image.cell;
+  var sy = (cy - L.image.y) / L.image.cell;
+  if (sx < 0 || sx >= SAND_W || sy < 0 || sy >= SAND_H) return null;
+  return { x: Math.floor(sx), y: Math.floor(sy) };
 }
