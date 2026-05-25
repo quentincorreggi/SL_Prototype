@@ -380,12 +380,12 @@ function drawJumpers() {
 function drawTrails() {
   for (var i = 0; i < attractionTrails.length; i++) {
     var t = attractionTrails[i];
-    var slot = t.slot;
-    var bpos = getBeltSlotPos(slot);
     var p = t.t / t.dur;
-    // Arc the trail upward in the middle
-    var x = t.fromX + (bpos.x - t.fromX) * p;
-    var y = t.fromY + (bpos.y - t.fromY) * p - 50 * S * Math.sin(p * Math.PI);
+    // Straight line from grain origin to the bucket's current centre.
+    // toX/toY are re-steered every frame in updateAttractionTrails so
+    // the grain keeps homing in as the bucket scrolls.
+    var x = t.fromX + (t.toX - t.fromX) * p;
+    var y = t.fromY + (t.toY - t.fromY) * p;
     var c = COLORS[t.ci];
     ctx.save();
     ctx.shadowColor = c.glow;
@@ -394,16 +394,6 @@ function drawTrails() {
     ctx.beginPath();
     ctx.arc(x, y, 3.5 * S * (1 - 0.3 * p), 0, Math.PI * 2);
     ctx.fill();
-    // Trailing tail (3 ghost dots)
-    for (var k = 1; k < 4; k++) {
-      var pk = Math.max(0, p - k * 0.05);
-      var tx = t.fromX + (bpos.x - t.fromX) * pk;
-      var ty = t.fromY + (bpos.y - t.fromY) * pk - 50 * S * Math.sin(pk * Math.PI);
-      ctx.globalAlpha = 0.45 - k * 0.12;
-      ctx.beginPath();
-      ctx.arc(tx, ty, 2.5 * S * (1 - 0.3 * pk), 0, Math.PI * 2);
-      ctx.fill();
-    }
     ctx.restore();
   }
 }

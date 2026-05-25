@@ -3,6 +3,14 @@
 // ============================================================
 
 function initGame(levelData) {
+  // Resize the sand grid based on the current subdivision setting.
+  // Each image-pixel will expand into a SAND_SUBDIV × SAND_SUBDIV block
+  // of independent sand cells (each a real particle that falls).
+  SAND_W = IMG_W * SAND_SUBDIV;
+  SAND_H = IMG_H * SAND_SUBDIV;
+  sandGrid = new Int8Array(SAND_W * SAND_H);
+  for (var s = 0; s < sandGrid.length; s++) sandGrid[s] = -1;
+
   computeLayout();
   initBelt();
   jumpers = [];
@@ -28,17 +36,30 @@ function initGame(levelData) {
     }
   }
 
-  // Sand image
-  for (var s = 0; s < sandGrid.length; s++) sandGrid[s] = -1;
+  // Expand the 32×32 image into the sand grid: each image-pixel of color C
+  // fills a SAND_SUBDIV × SAND_SUBDIV block. These behave as real particles
+  // under the CA — they can fall, settle, and shift independently.
   if (lvl.sandImage) {
-    for (var i = 0; i < Math.min(sandGrid.length, lvl.sandImage.length); i++) {
-      sandGrid[i] = lvl.sandImage[i];
+    for (var py = 0; py < IMG_H; py++) {
+      for (var px = 0; px < IMG_W; px++) {
+        var ci = lvl.sandImage[py * IMG_W + px];
+        if (ci == null || ci < 0) continue;
+        for (var dy = 0; dy < SAND_SUBDIV; dy++) {
+          for (var dx = 0; dx < SAND_SUBDIV; dx++) {
+            var sx = px * SAND_SUBDIV + dx;
+            var sy = py * SAND_SUBDIV + dy;
+            sandGrid[sy * SAND_W + sx] = ci;
+          }
+        }
+      }
     }
   }
 
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
+  updateTunnels();
   updateBucketActivation();
+  showQuitBtn();
 }
 
 function computeLevelCapacities() {
@@ -139,33 +160,39 @@ function updateBucketActivation() {
       cell.active = active;
     }
   }
+}
 
-  // Tunnels: if visited and have contents, spawn next bucket into adjacent
-  // cell. Spawned buckets become candidates for activation next pass.
-  var spawnedAny = false;
-  for (var idx2 = 0; idx2 < stock.length; idx2++) {
-    var cell2 = stock[idx2];
-    if (!cell2 || cell2.kind !== 'tunnel') continue;
-    if (!visited[idx2]) continue;
-    if (!cell2.contents || cell2.contents.length === 0) continue;
-    var target = tunnelTargetIndex(idx2, cell2.dir);
-    if (target < 0) continue;
-    if (stock[target] != null) continue;
-    var next = cell2.contents.shift();
-    cell2.spawned = (cell2.spawned || 0) + 1;
-    stock[target] = {
-      kind: 'bucket',
-      type: next.type || 'default',
-      ci: next.ci | 0,
-      used: false,
-      active: false
-    };
-    spawnedAny = true;
+// Spawn the next queued bucket from every tunnel whose target cell is
+// currently empty. Runs independently of activation — as soon as the
+// exit cell is free, the next item in the queue spawns. Loops because
+// chains of tunnels may cascade in one pass. Returns true if anything
+// spawned, so callers can re-run activation.
+function updateTunnels() {
+  var any = false;
+  var spawned = true;
+  while (spawned) {
+    spawned = false;
+    for (var idx2 = 0; idx2 < stock.length; idx2++) {
+      var cell2 = stock[idx2];
+      if (!cell2 || cell2.kind !== 'tunnel') continue;
+      if (!cell2.contents || cell2.contents.length === 0) continue;
+      var target = tunnelTargetIndex(idx2, cell2.dir);
+      if (target < 0) continue;
+      if (stock[target] != null) continue;
+      var next = cell2.contents.shift();
+      cell2.spawned = (cell2.spawned || 0) + 1;
+      stock[target] = {
+        kind: 'bucket',
+        type: next.type || 'default',
+        ci: next.ci | 0,
+        used: false,
+        active: false
+      };
+      spawned = true;
+      any = true;
+    }
   }
-  if (spawnedAny) {
-    // One more pass so newly-spawned buckets get their active flag this frame.
-    updateBucketActivation();
-  }
+  return any;
 }
 
 function tunnelTargetIndex(idx, dir) {
@@ -219,6 +246,7 @@ function handleTap(sx, sy) {
   });
 
   if (typeof sfx !== 'undefined') sfx.drop();
+  updateTunnels();
   updateBucketActivation();
 }
 
@@ -266,12 +294,15 @@ function update() {
   updateBelt();
   updateJumpers();
   updateRejectShake();
-  if (tick % 2 === 0) updateSand(); // CA at half framerate looks calmer
+  // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
+  if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
   if (typeof tickParticles === 'function') tickParticles();
-
+  // Tunnels poll continuously — a queued bucket spawns the moment its
+  // exit cell becomes free (e.g. after a player tap).
+  if (updateTunnels()) updateBucketActivation();
   checkWin();
 }
 
@@ -327,6 +358,7 @@ function hideWin() {
 function showLevelSelect() {
   hideWin();
   gameActive = false;
+  hideQuitBtn();
   // If we got here from Test Play, return to the editor with state intact.
   if (typeof edPlayingFromEditor !== 'undefined' && edPlayingFromEditor) {
     edPlayingFromEditor = false;
@@ -338,6 +370,18 @@ function showLevelSelect() {
   var ed = document.getElementById('editor-screen');
   if (ls) ls.classList.remove('hidden');
   if (ed) ed.classList.add('hidden');
+}
+
+function showQuitBtn() {
+  var b = document.getElementById('quit-btn');
+  if (b) b.style.display = 'flex';
+}
+function hideQuitBtn() {
+  var b = document.getElementById('quit-btn');
+  if (b) b.style.display = 'none';
+}
+function quitGame() {
+  showLevelSelect();
 }
 
 // ============================================================
@@ -355,12 +399,12 @@ function demoLevel() {
   placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
   placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
 
-  // Sand image: simple horizontal stripes of colors 0..2
-  var sand = new Array(SAND_W * SAND_H);
-  for (var y = 0; y < SAND_H; y++) {
+  // Sand image (32×32): simple horizontal stripes of colors 0..2
+  var sand = new Array(IMG_W * IMG_H);
+  for (var y = 0; y < IMG_H; y++) {
     var ci = (y < 11) ? 0 : (y < 22) ? 1 : 2;
-    for (var x = 0; x < SAND_W; x++) {
-      sand[y * SAND_W + x] = ci;
+    for (var x = 0; x < IMG_W; x++) {
+      sand[y * IMG_W + x] = ci;
     }
   }
   return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
