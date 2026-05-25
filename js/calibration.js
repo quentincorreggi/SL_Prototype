@@ -67,6 +67,7 @@ function hookGlobalSlider(id, globalName, onChange) {
   hookGlobalSlider('cal-radius',  'ATTRACT_RADIUS_CELLS');
   hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
   hookGlobalSlider('cal-batch',   'ATTRACT_BATCH');
+  hookGlobalSlider('cal-sandint', 'SAND_FRAME_INTERVAL');
   // Subdivision slider — display as "N×N" and refresh the editor's
   // capacity totals (each pixel becomes N² grains).
   var subEl = document.getElementById('cal-subdiv');

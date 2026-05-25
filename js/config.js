@@ -52,6 +52,7 @@ var levelCapacities = [];
 var ATTRACT_RADIUS_CELLS = 2;  // image-pixel units (scaled by SAND_SUBDIV)
 var ATTRACT_PULL_FRAMES = 1;   // frames between pull cycles per bucket
 var ATTRACT_BATCH = 12;        // grains pulled per cycle (debug slider)
+var SAND_FRAME_INTERVAL = 2;   // run the falling-sand CA every N frames
 var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
 var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc

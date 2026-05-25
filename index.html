@@ -260,6 +260,11 @@
     <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="3">
     <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
   </div>
+  <div class="cal-row">
+    <label>Sand CA interval <span class="v" id="cal-sandint-v">2</span></label>
+    <input id="cal-sandint" type="range" min="1" max="10" step="1" value="2">
+    <div class="hint">How often the falling-sand physics ticks (in render frames). 1&nbsp;=&nbsp;every frame (snappiest), higher&nbsp;=&nbsp;slower, heavier feel.</div>
+  </div>
 </div>
 
 <div id="level-screen">
