@@ -50,7 +50,8 @@ var beltOffset = 0;            // 0..1 — fraction of a slot scrolled left
 // their own `.capacity` field at creation. There is no global capacity const.
 var levelCapacities = [];
 var ATTRACT_RADIUS_CELLS = 8;  // sand-cell units
-var ATTRACT_PULL_FRAMES = 6;   // pull one grain every N frames per bucket
+var ATTRACT_PULL_FRAMES = 6;   // frames between pull cycles per bucket
+var ATTRACT_BATCH = 1;         // grains pulled per cycle (debug slider)
 var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
 var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc

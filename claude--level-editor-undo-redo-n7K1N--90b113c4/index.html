@@ -237,7 +237,12 @@
   <div class="cal-row">
     <label>Pull interval <span class="v" id="cal-pull-v">6</span></label>
     <input id="cal-pull" type="range" min="1" max="40" step="1" value="6">
-    <div class="hint">Frames between grain pulls. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
+    <div class="hint">Frames between pull cycles. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
+  </div>
+  <div class="cal-row">
+    <label>Grains per cycle <span class="v" id="cal-batch-v">1</span></label>
+    <input id="cal-batch" type="range" min="1" max="20" step="1" value="1">
+    <div class="hint">How many grains the bucket pulls each cycle (nearest first, capped by remaining capacity).</div>
   </div>
   <div class="cal-row">
     <label>Pixel subdivision <span class="v" id="cal-subdiv-v">1&times;1</span></label>

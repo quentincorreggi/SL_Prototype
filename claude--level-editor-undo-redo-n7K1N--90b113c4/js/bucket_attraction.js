@@ -4,14 +4,14 @@
 //
 // For every bucket on the belt:
 //   - tick pullCooldown down
-//   - when ready, pull EVERY matching grain currently in radius
-//     (capped by remaining capacity minus en-route trails)
+//   - when ready, pull the nearest ATTRACT_BATCH matching grains in
+//     the radius (capped by remaining capacity minus en-route trails)
 //   - extracted grains immediately leave sandGrid (sand above falls
 //     into the gaps on the next CA tick); a visual trail flies to
 //     the bucket for each one
-//   - the cooldown still imposes ATTRACT_PULL_FRAMES between pull
-//     cycles, so a grain that falls into the radius after a pull
-//     waits a frame-delay before being pulled itself
+//   - the cooldown imposes ATTRACT_PULL_FRAMES between pull cycles,
+//     so a grain that falls into the radius after a pull waits a
+//     frame-delay before being pulled
 //   - on trail arrival, bucket.fill++. When fill === bucket.capacity,
 //     the bucket is marked done — belt update will pop it next frame.
 //     Capacity is per-color (see game.js#computeLevelCapacities).
@@ -41,7 +41,11 @@ function updateBucketAttraction() {
     // ATTRACT_RADIUS_CELLS is in image-pixel units; scale to actual sand
     // cells so the physical reach stays consistent across subdivisions.
     var radius = ATTRACT_RADIUS_CELLS * SAND_SUBDIV;
-    var grains = findGrainsInRadius(sp.x, sp.y, b.ci, radius, remaining);
+    // Pull up to ATTRACT_BATCH grains per cycle, capped by remaining
+    // capacity. The nearest grains go first.
+    var batch = Math.max(1, ATTRACT_BATCH | 0);
+    var cap = Math.min(batch, remaining);
+    var grains = findGrainsInRadius(sp.x, sp.y, b.ci, radius, cap);
     if (grains.length === 0) continue;
 
     for (var g = 0; g < grains.length; g++) {
