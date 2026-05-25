@@ -294,7 +294,8 @@ function update() {
   updateBelt();
   updateJumpers();
   updateRejectShake();
-  if (tick % 2 === 0) updateSand(); // CA at half framerate looks calmer
+  // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
+  if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
