@@ -42,9 +42,22 @@
     background:rgba(160,130,100,0.8);color:white;font-size:20px;cursor:pointer;font-family:'Fredoka',sans-serif}
   #cal-panel{display:none;position:absolute;top:55px;right:10px;z-index:30;
     background:rgba(240,230,218,0.95);border-radius:14px;padding:12px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.2);width:220px;max-height:80vh;overflow-y:auto;font-family:'Fredoka',sans-serif}
+    box-shadow:0 4px 20px rgba(0,0,0,0.2);width:260px;max-height:80vh;overflow-y:auto;font-family:'Fredoka',sans-serif}
   #cal-panel h3{font-size:11px;color:#8B6914;margin:8px 0 4px;text-transform:uppercase;letter-spacing:1px}
   #cal-panel p{font-size:11px;color:#5A4A38}
+  .cal-row{margin:8px 0;display:flex;flex-direction:column;gap:3px}
+  .cal-row label{font-size:12px;color:#5A4A38;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .cal-row label .v{background:rgba(123,82,160,0.18);color:#7B52A0;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:700}
+  .cal-row input[type=range]{width:100%;accent-color:#7B52A0}
+  .cal-row .hint{font-size:10px;color:#9C8A70;font-style:italic}
+
+  /* === Quit button (visible during gameplay only) === */
+  #quit-btn{display:none;position:absolute;top:10px;left:10px;z-index:30;
+    align-items:center;gap:6px;padding:0 14px;height:40px;border-radius:12px;border:none;
+    background:rgba(160,130,100,0.8);color:white;font-size:14px;font-weight:700;cursor:pointer;
+    font-family:'Fredoka',sans-serif;box-shadow:0 3px 12px rgba(0,0,0,0.15)}
+  #quit-btn:hover{background:rgba(180,140,110,0.9);transform:scale(1.04)}
+  #quit-btn:active{transform:scale(0.95)}
 
   /* ============================================================
      EDITOR — full-screen, two-pane layout
@@ -181,6 +194,12 @@
   .ed-qbtn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
     cursor:pointer;color:#5A4A38;background:rgba(180,165,145,0.35);transition:transform 0.12s}
   .ed-qbtn:hover{background:rgba(180,165,145,0.55);transform:scale(1.05)}
+  .ed-presets{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center;flex-shrink:0;font-size:11px;color:#5A4A38}
+  .ed-presets-label{font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:0.8px;font-size:10px;margin-right:2px}
+  .ed-preset-btn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
+    cursor:pointer;color:#fff;background:linear-gradient(135deg,#C89CF2,#9060C4);
+    box-shadow:0 2px 6px rgba(144,96,196,0.25);transition:transform 0.12s}
+  .ed-preset-btn:hover{transform:scale(1.06)}
 
   .ed-action{padding:10px 18px;border:none;border-radius:12px;font-family:'Fredoka',sans-serif;font-size:13px;font-weight:700;
     cursor:pointer;color:white;transition:transform 0.15s}
@@ -211,10 +230,41 @@
 <body>
 <canvas id="game"></canvas>
 
+<button id="quit-btn" onclick="quitGame()">&#10005; Quit</button>
+
 <button id="cal-toggle">&#9881;</button>
 <div id="cal-panel">
-  <h3>Calibration</h3>
-  <p>Sliders will be added per prototype as needed.</p>
+  <h3>Debug</h3>
+  <div class="cal-row">
+    <label>Belt speed <span class="v" id="cal-belt-speed-v">7</span></label>
+    <input id="cal-belt-speed" type="range" min="0" max="100" step="1" value="7">
+    <div class="hint">Conveyor scroll speed (0 = paused). 7&nbsp;≈ one slot every 2.4&nbsp;s at 60&nbsp;fps.</div>
+  </div>
+  <div class="cal-row">
+    <label>Bucket radius <span class="v" id="cal-radius-v">2</span></label>
+    <input id="cal-radius" type="range" min="1" max="20" step="1" value="2">
+    <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
+  </div>
+  <div class="cal-row">
+    <label>Pull interval <span class="v" id="cal-pull-v">1</span></label>
+    <input id="cal-pull" type="range" min="1" max="40" step="1" value="1">
+    <div class="hint">Frames between pull cycles. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
+  </div>
+  <div class="cal-row">
+    <label>Grains per cycle <span class="v" id="cal-batch-v">12</span></label>
+    <input id="cal-batch" type="range" min="1" max="20" step="1" value="12">
+    <div class="hint">How many grains the bucket pulls each cycle (nearest first, capped by remaining capacity).</div>
+  </div>
+  <div class="cal-row">
+    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">3&times;3</span></label>
+    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="3">
+    <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
+  </div>
+  <div class="cal-row">
+    <label>Sand CA interval <span class="v" id="cal-sandint-v">2</span></label>
+    <input id="cal-sandint" type="range" min="1" max="10" step="1" value="2">
+    <div class="hint">How often the falling-sand physics ticks (in render frames). 1&nbsp;=&nbsp;every frame (snappiest), higher&nbsp;=&nbsp;slower, heavier feel.</div>
+  </div>
 </div>
 
 <div id="level-screen">
@@ -260,8 +310,16 @@
         <div class="ed-grid-area"><div id="ed-grid"></div></div>
         <div class="ed-quick">
           <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
-          <button class="ed-qbtn" onclick="edRandomSand()">&#127770; Stripe Sand</button>
+          <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
         </div>
+        <div class="ed-presets">
+          <span class="ed-presets-label">Presets</span>
+          <button class="ed-preset-btn" onclick="edLoadPreset(0)">4 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(1)">5 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(2)">6 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(3)">7 colors</button>
+        </div>
+        <input type="file" id="ed-png-input" accept="image/png" style="display:none" onchange="edImportPNG(event)">
         <div id="ed-tunnel-panel"></div>
       </div>
     </div>

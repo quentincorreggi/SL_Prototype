@@ -20,7 +20,7 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(SAND_W * SAND_H)
+  sandImage: new Array(IMG_W * IMG_H)
 };
 
 // --- Bucket-grid state ---
@@ -45,6 +45,11 @@ var edSnapshot = null;      // sandImage array snapshot at drag start (for shape
 var edInitialized = false;
 var edPlayingFromEditor = false;
 
+// --- Undo/redo stack (full level snapshots) ---
+var edHistory = [];
+var edHistoryIdx = -1;
+var ED_HISTORY_LIMIT = 80;
+
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
@@ -55,7 +60,90 @@ function edInit() {
   edBindSandPointer();
   edRefreshLiveSections();
   edHideTunnelPanel();
+  edHistory = [];
+  edHistoryIdx = -1;
+  edPushHistory();
 }
+
+// ============================================================
+// Undo / Redo — full snapshot per discrete edit (stroke, cell, etc.)
+// ============================================================
+
+function edSnapshotState() {
+  return {
+    name: edLevel.name,
+    desc: edLevel.desc,
+    grid: edLevel.grid.map(cloneCellForLevel),
+    sandImage: edLevel.sandImage.slice()
+  };
+}
+
+function edPushHistory() {
+  // Truncate any redo branch
+  if (edHistoryIdx < edHistory.length - 1) {
+    edHistory.length = edHistoryIdx + 1;
+  }
+  edHistory.push(edSnapshotState());
+  if (edHistory.length > ED_HISTORY_LIMIT) {
+    edHistory.shift();
+  }
+  edHistoryIdx = edHistory.length - 1;
+}
+
+function edRestoreState(s) {
+  edLevel.name = s.name;
+  edLevel.desc = s.desc;
+  edLevel.grid = s.grid.map(cloneCellForLevel);
+  edLevel.sandImage = s.sandImage.slice();
+  // Cancel any in-progress drag so a subsequent move event won't restore
+  // the pre-drag snapshot over the just-restored state.
+  edDragging = false;
+  edDragMode = null;
+  edDragStart = null;
+  edDragLast = null;
+  edSnapshot = null;
+  var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
+  var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
+  edRefreshSandGrid();
+  edBuildGrid();
+  edBuildToolbar();
+  edSelectedTunnel = -1;
+  edHideTunnelPanel();
+  edRefreshLiveSections();
+}
+
+function edUndo() {
+  if (edHistoryIdx <= 0) return;
+  edHistoryIdx--;
+  edRestoreState(edHistory[edHistoryIdx]);
+  edToast('Undo');
+}
+
+function edRedo() {
+  if (edHistoryIdx >= edHistory.length - 1) return;
+  edHistoryIdx++;
+  edRestoreState(edHistory[edHistoryIdx]);
+  edToast('Redo');
+}
+
+(function bindEditorShortcuts() {
+  document.addEventListener('keydown', function (e) {
+    var ed = document.getElementById('editor-screen');
+    if (!ed || ed.classList.contains('hidden')) return;
+    var tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+    var meta = e.ctrlKey || e.metaKey;
+    if (!meta) return;
+    var k = (e.key || '').toLowerCase();
+    if (k === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) edRedo(); else edUndo();
+    } else if (k === 'y') {
+      e.preventDefault();
+      edRedo();
+    }
+  });
+})();
 
 // ============================================================
 // Counts / capacities / validation
@@ -110,7 +198,7 @@ function edRenderCapacities() {
     if (stats.sand[ci] === 0 && stats.bkt[ci] === 0) continue;
     anyVisible = true;
     var c = COLORS[ci];
-    var s = stats.sand[ci], b = stats.bkt[ci];
+    var s = stats.sand[ci] * (SAND_SUBDIV * SAND_SUBDIV || 1), b = stats.bkt[ci];
     var cap = (s > 0 && b > 0) ? Math.ceil(s / b) : 0;
     var chip = document.createElement('div');
     chip.className = 'ed-cap-chip';
@@ -243,7 +331,7 @@ function edBuildSandGrid() {
   if (!g) return;
   g.innerHTML = '';
   edSandCells = [];
-  for (var i = 0; i < SAND_W * SAND_H; i++) {
+  for (var i = 0; i < IMG_W * IMG_H; i++) {
     var px = document.createElement('div');
     px.className = 'ed-sand-px';
     edApplySandCell(px, edLevel.sandImage[i]);
@@ -276,11 +364,11 @@ function pointerToSandCell(e) {
   var g = document.getElementById('ed-sand-grid');
   if (!g) return null;
   var rect = g.getBoundingClientRect();
-  var cellW = rect.width / SAND_W;
-  var cellH = rect.height / SAND_H;
+  var cellW = rect.width / IMG_W;
+  var cellH = rect.height / IMG_H;
   var x = Math.floor((e.clientX - rect.left) / cellW);
   var y = Math.floor((e.clientY - rect.top) / cellH);
-  if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) return null;
+  if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) return null;
   return { x: x, y: y };
 }
 
@@ -318,6 +406,7 @@ function onSandPointerDown(e) {
     edRefreshSandGrid();
     edDragging = false; // single-shot
     edOnSandChanged();
+    edPushHistory();
     return;
   }
   if (mode === 'brush' || mode === 'eraser') {
@@ -375,6 +464,7 @@ function onSandPointerUp(e) {
   edDragLast = null;
   edSnapshot = null;
   edOnSandChanged();
+  edPushHistory();
 }
 
 // ============================================================
@@ -387,8 +477,8 @@ function paintBrush(cx, cy, ci, size) {
   for (var dy = -halfL; dy <= halfR; dy++) {
     for (var dx = -halfL; dx <= halfR; dx++) {
       var x = cx + dx, y = cy + dy;
-      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-        edLevel.sandImage[y * SAND_W + x] = ci;
+      if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+        edLevel.sandImage[y * IMG_W + x] = ci;
       }
     }
   }
@@ -411,15 +501,15 @@ function paintLine(x0, y0, x1, y1, ci, size) {
 
 // 4-connected flood fill
 function floodFill(sx, sy, ci) {
-  if (sx < 0 || sx >= SAND_W || sy < 0 || sy >= SAND_H) return;
-  var target = edLevel.sandImage[sy * SAND_W + sx];
+  if (sx < 0 || sx >= IMG_W || sy < 0 || sy >= IMG_H) return;
+  var target = edLevel.sandImage[sy * IMG_W + sx];
   if (target === ci) return;
   var stack = [[sx, sy]];
   while (stack.length > 0) {
     var p = stack.pop();
     var x = p[0], y = p[1];
-    if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) continue;
-    var i = y * SAND_W + x;
+    if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) continue;
+    var i = y * IMG_W + x;
     if (edLevel.sandImage[i] !== target) continue;
     edLevel.sandImage[i] = ci;
     stack.push([x + 1, y]);
@@ -434,8 +524,8 @@ function drawRectShape(x0, y0, x1, y1, ci) {
   var minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
   for (var y = minY; y <= maxY; y++) {
     for (var x = minX; x <= maxX; x++) {
-      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-        edLevel.sandImage[y * SAND_W + x] = ci;
+      if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+        edLevel.sandImage[y * IMG_W + x] = ci;
       }
     }
   }
@@ -453,8 +543,8 @@ function drawEllipseShape(x0, y0, x1, y1, ci) {
       var dx = (x - cx) / rx;
       var dy = (y - cy) / ry;
       if (dx * dx + dy * dy <= 1.0) {
-        if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
-          edLevel.sandImage[y * SAND_W + x] = ci;
+        if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) {
+          edLevel.sandImage[y * IMG_W + x] = ci;
         }
       }
     }
@@ -590,19 +680,23 @@ function edPaintCell(idx, eraseOverride) {
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
   } else if (edTool === 'tunnel') {
+    var newTunnel = false;
     if (!edLevel.grid[idx] || edLevel.grid[idx].kind !== 'tunnel') {
       edLevel.grid[idx] = { kind: 'tunnel', dir: 'top', contents: [] };
+      newTunnel = true;
     }
     edSelectedTunnel = idx;
     edBuildGrid();
     edRefreshLiveSections();
     edShowTunnelPanel(idx);
+    if (newTunnel) edPushHistory();
     return;
   }
   edSelectedTunnel = -1;
   edHideTunnelPanel();
   edBuildGrid();
   edRefreshLiveSections();
+  edPushHistory();
 }
 
 // ============================================================
@@ -629,7 +723,7 @@ function edShowTunnelPanel(idx) {
     var btn = document.createElement('button');
     btn.className = 'ed-tunnel-dir-btn' + (t.dir === d ? ' active' : '');
     btn.textContent = d[0].toUpperCase() + d.slice(1);
-    btn.onclick = function () { t.dir = d; edShowTunnelPanel(idx); edBuildGrid(); };
+    btn.onclick = function () { t.dir = d; edShowTunnelPanel(idx); edBuildGrid(); edPushHistory(); };
     dirRow.appendChild(btn);
   });
   panel.appendChild(dirRow);
@@ -650,7 +744,7 @@ function edShowTunnelPanel(idx) {
       : 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
     btn.textContent = item.type === 'hidden' ? '?' : '';
     btn.title = CLR_NAMES[item.ci] + ' — click to remove';
-    btn.onclick = function () { t.contents.splice(i, 1); edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); };
+    btn.onclick = function () { t.contents.splice(i, 1); edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); edPushHistory(); };
     contentsList.appendChild(btn);
   });
   panel.appendChild(contentsList);
@@ -680,7 +774,7 @@ function edShowTunnelPanel(idx) {
       btn.onclick = function () {
         if (!t.contents) t.contents = [];
         t.contents.push({ type: type, ci: ci });
-        edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections();
+        edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); edPushHistory();
       };
       row.appendChild(btn);
     });
@@ -705,19 +799,137 @@ function edClearAll() {
   edRefreshSandGrid();
   edBuildToolbar();
   edRefreshLiveSections();
+  edPushHistory();
 }
 
 function edRandomSand() {
   var palette = edAvailableColors();
   if (palette.length === 0) palette = [0, 1, 2];
-  for (var y = 0; y < SAND_H; y++) {
-    var ci = palette[(y * palette.length / SAND_H) | 0];
-    for (var x = 0; x < SAND_W; x++) {
-      edLevel.sandImage[y * SAND_W + x] = ci;
+  for (var y = 0; y < IMG_H; y++) {
+    var ci = palette[(y * palette.length / IMG_H) | 0];
+    for (var x = 0; x < IMG_W; x++) {
+      edLevel.sandImage[y * IMG_W + x] = ci;
     }
   }
   edRefreshSandGrid();
   edOnSandChanged();
+  edPushHistory();
+}
+
+// ============================================================
+// Preset images (4 / 5 / 6 / 7 colors)
+// ============================================================
+
+function edMakeStripes(colorIds) {
+  var n = colorIds.length;
+  var img = new Array(IMG_W * IMG_H);
+  for (var y = 0; y < IMG_H; y++) {
+    // Distribute bands evenly across IMG_H rows.
+    var band = Math.min(n - 1, Math.floor(y * n / IMG_H));
+    for (var x = 0; x < IMG_W; x++) {
+      img[y * IMG_W + x] = colorIds[band];
+    }
+  }
+  return img;
+}
+
+// Palette: 0 cyan, 1 amber, 2 magenta, 3 white, 4 blue, 5 lime,
+// 6 forest, 7 pink, 8 red, 9 yellow, 10 violet, 11 crimson.
+var ED_PRESETS = [
+  { name: '4 colors', img: edMakeStripes([0, 1, 2, 3]) },
+  { name: '5 colors', img: edMakeStripes([0, 3, 5, 1, 8]) },
+  { name: '6 colors', img: edMakeStripes([4, 0, 5, 9, 1, 8]) },
+  { name: '7 colors', img: edMakeStripes([10, 4, 0, 5, 9, 1, 8]) }
+];
+
+function edLoadPreset(idx) {
+  var p = ED_PRESETS[idx];
+  if (!p) return;
+  edLevel.sandImage = p.img.slice();
+  edRefreshSandGrid();
+  edOnSandChanged();
+  edPushHistory();
+  edToast('Loaded ' + p.name);
+}
+
+// ============================================================
+// PNG import — maps each pixel to the nearest palette colour
+// ============================================================
+
+var _palRGB = null;
+function _paletteRGB() {
+  if (_palRGB) return _palRGB;
+  _palRGB = [];
+  for (var i = 0; i < NUM_COLORS; i++) {
+    var hex = COLORS[i].fill;
+    _palRGB.push([
+      parseInt(hex.substr(1, 2), 16),
+      parseInt(hex.substr(3, 2), 16),
+      parseInt(hex.substr(5, 2), 16)
+    ]);
+  }
+  return _palRGB;
+}
+
+function nearestColorIndex(r, g, b) {
+  var pal = _paletteRGB();
+  var bestI = 0, bestD = Infinity;
+  for (var i = 0; i < pal.length; i++) {
+    var dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+    var d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return bestI;
+}
+
+function edImportPNG(e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  var url = URL.createObjectURL(f);
+  var img = new Image();
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    // Down-sample (or up-sample) any size to 32×32, no smoothing so
+    // pixel-art colours stay crisp.
+    var c = document.createElement('canvas');
+    c.width = IMG_W;
+    c.height = IMG_H;
+    var cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.clearRect(0, 0, IMG_W, IMG_H);
+    cx.drawImage(img, 0, 0, IMG_W, IMG_H);
+    var data = cx.getImageData(0, 0, IMG_W, IMG_H).data;
+    var seen = {};
+    var seenCount = 0;
+    for (var i = 0; i < IMG_W * IMG_H; i++) {
+      var r = data[i * 4];
+      var g = data[i * 4 + 1];
+      var b = data[i * 4 + 2];
+      var a = data[i * 4 + 3];
+      if (a < 128) {
+        edLevel.sandImage[i] = -1;
+      } else {
+        var key = (r << 16) | (g << 8) | b;
+        if (!seen[key]) { seen[key] = 1; seenCount++; }
+        edLevel.sandImage[i] = nearestColorIndex(r, g, b);
+      }
+    }
+    edRefreshSandGrid();
+    edOnSandChanged();
+    edPushHistory();
+    if (seenCount > 12) {
+      edToast('Imported (' + seenCount + ' colours → mapped to 12-colour palette)');
+    } else {
+      edToast('Imported PNG (' + seenCount + ' colour' + (seenCount === 1 ? '' : 's') + ')');
+    }
+    e.target.value = '';
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    edToast('Failed to load PNG');
+    e.target.value = '';
+  };
+  img.src = url;
 }
 
 // ============================================================
@@ -808,8 +1020,8 @@ function editorImportJSON() {
     edLevel.desc = data.desc || '';
     edLevel.grid = (data.grid || []).slice(0, GRID_W * GRID_H);
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
-    edLevel.sandImage = (data.sandImage || []).slice(0, SAND_W * SAND_H);
-    while (edLevel.sandImage.length < SAND_W * SAND_H) edLevel.sandImage.push(-1);
+    edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
+    while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();
@@ -818,6 +1030,7 @@ function editorImportJSON() {
     edRefreshLiveSections();
     ta.style.display = 'none';
     edToast('Imported.');
+    edPushHistory();
   } catch (e) {
     edToast('Invalid JSON.');
   }

@@ -2,9 +2,9 @@
 // belt.js — 5-slot wrapping conveyor
 // ============================================================
 //
-// Belt scrolls right → left at BELT_SPEED slot-fractions per frame.
+// Belt scrolls left → right at BELT_SPEED slot-fractions per frame.
 // `beltOffset` accumulates 0..1; when it crosses 1, contents shift one
-// slot left (slot 0 wraps to slot BELT_SLOTS-1).
+// slot right (slot BELT_SLOTS-1 wraps to slot 0).
 //
 // Slot contents are bucket-on-belt objects:
 //   { type: 'default'|'hidden', ci, fill, pullCooldown, done, popT,
@@ -28,10 +28,10 @@ function updateBelt() {
     beltOffset += BELT_SPEED;
     while (beltOffset >= 1) {
       beltOffset -= 1;
-      // Right→left scroll: shift contents one slot left, slot 0 wraps to last.
-      var first = beltSlots[0];
-      for (var i = 0; i < BELT_SLOTS - 1; i++) beltSlots[i] = beltSlots[i + 1];
-      beltSlots[BELT_SLOTS - 1] = first;
+      // Left→right scroll: shift contents one slot right, last wraps to slot 0.
+      var last = beltSlots[BELT_SLOTS - 1];
+      for (var i = BELT_SLOTS - 1; i > 0; i--) beltSlots[i] = beltSlots[i - 1];
+      beltSlots[0] = last;
     }
   }
 
@@ -57,9 +57,9 @@ function updateBelt() {
 }
 
 function firstFreeBeltSlot() {
-  // Right-most free slot first — newly-tapped buckets enter on the right
-  // and ride leftward.
-  for (var i = BELT_SLOTS - 1; i >= 0; i--) {
+  // Left-most free slot first — newly-tapped buckets enter on the left
+  // and ride rightward.
+  for (var i = 0; i < BELT_SLOTS; i++) {
     if (beltSlots[i] == null) return i;
   }
   return -1;
@@ -76,7 +76,7 @@ function countBucketsOnBelt() {
 
 function getBeltSlotPos(i) {
   var slotW = L.belt.w / BELT_SLOTS;
-  var x = L.belt.x + slotW * (i + 0.5 - beltOffset);
+  var x = L.belt.x + slotW * (i + 0.5 + beltOffset);
   var y = L.belt.y + L.belt.h / 2;
   return { x: x, y: y };
 }
