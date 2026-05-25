@@ -194,6 +194,12 @@
   .ed-qbtn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
     cursor:pointer;color:#5A4A38;background:rgba(180,165,145,0.35);transition:transform 0.12s}
   .ed-qbtn:hover{background:rgba(180,165,145,0.55);transform:scale(1.05)}
+  .ed-presets{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center;flex-shrink:0;font-size:11px;color:#5A4A38}
+  .ed-presets-label{font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:0.8px;font-size:10px;margin-right:2px}
+  .ed-preset-btn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
+    cursor:pointer;color:#fff;background:linear-gradient(135deg,#C89CF2,#9060C4);
+    box-shadow:0 2px 6px rgba(144,96,196,0.25);transition:transform 0.12s}
+  .ed-preset-btn:hover{transform:scale(1.06)}
 
   .ed-action{padding:10px 18px;border:none;border-radius:12px;font-family:'Fredoka',sans-serif;font-size:13px;font-weight:700;
     cursor:pointer;color:white;transition:transform 0.15s}
@@ -235,23 +241,23 @@
     <div class="hint">Conveyor scroll speed (0 = paused). 11&nbsp;≈ one slot every 1.5&nbsp;s at 60&nbsp;fps.</div>
   </div>
   <div class="cal-row">
-    <label>Bucket radius <span class="v" id="cal-radius-v">8</span></label>
-    <input id="cal-radius" type="range" min="1" max="20" step="1" value="8">
+    <label>Bucket radius <span class="v" id="cal-radius-v">3</span></label>
+    <input id="cal-radius" type="range" min="1" max="20" step="1" value="3">
     <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
   </div>
   <div class="cal-row">
-    <label>Pull interval <span class="v" id="cal-pull-v">6</span></label>
-    <input id="cal-pull" type="range" min="1" max="40" step="1" value="6">
+    <label>Pull interval <span class="v" id="cal-pull-v">1</span></label>
+    <input id="cal-pull" type="range" min="1" max="40" step="1" value="1">
     <div class="hint">Frames between pull cycles. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
   </div>
   <div class="cal-row">
-    <label>Grains per cycle <span class="v" id="cal-batch-v">1</span></label>
-    <input id="cal-batch" type="range" min="1" max="20" step="1" value="1">
+    <label>Grains per cycle <span class="v" id="cal-batch-v">8</span></label>
+    <input id="cal-batch" type="range" min="1" max="20" step="1" value="8">
     <div class="hint">How many grains the bucket pulls each cycle (nearest first, capped by remaining capacity).</div>
   </div>
   <div class="cal-row">
-    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">1&times;1</span></label>
-    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="1">
+    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">2&times;2</span></label>
+    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="2">
     <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
   </div>
 </div>
@@ -299,8 +305,16 @@
         <div class="ed-grid-area"><div id="ed-grid"></div></div>
         <div class="ed-quick">
           <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
-          <button class="ed-qbtn" onclick="edRandomSand()">&#127770; Stripe Sand</button>
+          <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
         </div>
+        <div class="ed-presets">
+          <span class="ed-presets-label">Presets</span>
+          <button class="ed-preset-btn" onclick="edLoadPreset(0)">4 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(1)">5 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(2)">6 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(3)">7 colors</button>
+        </div>
+        <input type="file" id="ed-png-input" accept="image/png" style="display:none" onchange="edImportPNG(event)">
         <div id="ed-tunnel-panel"></div>
       </div>
     </div>

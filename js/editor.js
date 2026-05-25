@@ -817,6 +817,122 @@ function edRandomSand() {
 }
 
 // ============================================================
+// Preset images (4 / 5 / 6 / 7 colors)
+// ============================================================
+
+function edMakeStripes(colorIds) {
+  var n = colorIds.length;
+  var img = new Array(IMG_W * IMG_H);
+  for (var y = 0; y < IMG_H; y++) {
+    // Distribute bands evenly across IMG_H rows.
+    var band = Math.min(n - 1, Math.floor(y * n / IMG_H));
+    for (var x = 0; x < IMG_W; x++) {
+      img[y * IMG_W + x] = colorIds[band];
+    }
+  }
+  return img;
+}
+
+// Palette: 0 cyan, 1 amber, 2 magenta, 3 white, 4 blue, 5 lime,
+// 6 forest, 7 pink, 8 red, 9 yellow, 10 violet, 11 crimson.
+var ED_PRESETS = [
+  { name: '4 colors', img: edMakeStripes([0, 1, 2, 3]) },
+  { name: '5 colors', img: edMakeStripes([0, 3, 5, 1, 8]) },
+  { name: '6 colors', img: edMakeStripes([4, 0, 5, 9, 1, 8]) },
+  { name: '7 colors', img: edMakeStripes([10, 4, 0, 5, 9, 1, 8]) }
+];
+
+function edLoadPreset(idx) {
+  var p = ED_PRESETS[idx];
+  if (!p) return;
+  edLevel.sandImage = p.img.slice();
+  edRefreshSandGrid();
+  edOnSandChanged();
+  edPushHistory();
+  edToast('Loaded ' + p.name);
+}
+
+// ============================================================
+// PNG import — maps each pixel to the nearest palette colour
+// ============================================================
+
+var _palRGB = null;
+function _paletteRGB() {
+  if (_palRGB) return _palRGB;
+  _palRGB = [];
+  for (var i = 0; i < NUM_COLORS; i++) {
+    var hex = COLORS[i].fill;
+    _palRGB.push([
+      parseInt(hex.substr(1, 2), 16),
+      parseInt(hex.substr(3, 2), 16),
+      parseInt(hex.substr(5, 2), 16)
+    ]);
+  }
+  return _palRGB;
+}
+
+function nearestColorIndex(r, g, b) {
+  var pal = _paletteRGB();
+  var bestI = 0, bestD = Infinity;
+  for (var i = 0; i < pal.length; i++) {
+    var dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+    var d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return bestI;
+}
+
+function edImportPNG(e) {
+  var f = e.target.files && e.target.files[0];
+  if (!f) return;
+  var url = URL.createObjectURL(f);
+  var img = new Image();
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    // Down-sample (or up-sample) any size to 32×32, no smoothing so
+    // pixel-art colours stay crisp.
+    var c = document.createElement('canvas');
+    c.width = IMG_W;
+    c.height = IMG_H;
+    var cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.clearRect(0, 0, IMG_W, IMG_H);
+    cx.drawImage(img, 0, 0, IMG_W, IMG_H);
+    var data = cx.getImageData(0, 0, IMG_W, IMG_H).data;
+    var seen = {};
+    var seenCount = 0;
+    for (var i = 0; i < IMG_W * IMG_H; i++) {
+      var r = data[i * 4];
+      var g = data[i * 4 + 1];
+      var b = data[i * 4 + 2];
+      var a = data[i * 4 + 3];
+      if (a < 128) {
+        edLevel.sandImage[i] = -1;
+      } else {
+        var key = (r << 16) | (g << 8) | b;
+        if (!seen[key]) { seen[key] = 1; seenCount++; }
+        edLevel.sandImage[i] = nearestColorIndex(r, g, b);
+      }
+    }
+    edRefreshSandGrid();
+    edOnSandChanged();
+    edPushHistory();
+    if (seenCount > 12) {
+      edToast('Imported (' + seenCount + ' colours → mapped to 12-colour palette)');
+    } else {
+      edToast('Imported PNG (' + seenCount + ' colour' + (seenCount === 1 ? '' : 's') + ')');
+    }
+    e.target.value = '';
+  };
+  img.onerror = function () {
+    URL.revokeObjectURL(url);
+    edToast('Failed to load PNG');
+    e.target.value = '';
+  };
+  img.src = url;
+}
+
+// ============================================================
 // Screens / Test Play / Export / Import
 // ============================================================
 

@@ -35,7 +35,7 @@ var belowReveals = [];         // hidden-bucket reveal animations (on belt landi
 // expands into a SAND_SUBDIV × SAND_SUBDIV block of real sand cells
 // that fall via the CA independently. Resized at initGame.
 var IMG_W = 32, IMG_H = 32;
-var SAND_SUBDIV = 1;
+var SAND_SUBDIV = 2;
 var SAND_W = IMG_W * SAND_SUBDIV, SAND_H = IMG_H * SAND_SUBDIV;
 var sandGrid = new Int8Array(SAND_W * SAND_H);   // color index 0..NUM_COLORS-1, or -1 for empty
 
@@ -49,9 +49,9 @@ var beltOffset = 0;            // 0..1 — fraction of a slot scrolled left
 // `levelCapacities[ci]` is recomputed at every initGame; belt buckets get
 // their own `.capacity` field at creation. There is no global capacity const.
 var levelCapacities = [];
-var ATTRACT_RADIUS_CELLS = 8;  // sand-cell units
-var ATTRACT_PULL_FRAMES = 6;   // frames between pull cycles per bucket
-var ATTRACT_BATCH = 1;         // grains pulled per cycle (debug slider)
+var ATTRACT_RADIUS_CELLS = 3;  // image-pixel units (scaled by SAND_SUBDIV)
+var ATTRACT_PULL_FRAMES = 1;   // frames between pull cycles per bucket
+var ATTRACT_BATCH = 8;         // grains pulled per cycle (debug slider)
 var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
 var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc
