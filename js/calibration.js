@@ -52,6 +52,18 @@ function hookGlobalSlider(id, globalName, onChange) {
 }
 
 (function bindDebugSliders() {
+  // Belt speed — slider is an integer 0–100; internal BELT_SPEED is /1000
+  // (so 11 → 0.011, the original default).
+  var bsEl = document.getElementById('cal-belt-speed');
+  var bsVal = document.getElementById('cal-belt-speed-v');
+  if (bsEl) {
+    bsEl.value = Math.round((BELT_SPEED || 0.011) * 1000);
+    if (bsVal) bsVal.textContent = bsEl.value;
+    bsEl.addEventListener('input', function () {
+      BELT_SPEED = parseFloat(bsEl.value) / 1000;
+      if (bsVal) bsVal.textContent = bsEl.value;
+    });
+  }
   hookGlobalSlider('cal-radius',  'ATTRACT_RADIUS_CELLS');
   hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
   hookGlobalSlider('cal-batch',   'ATTRACT_BATCH');

@@ -230,6 +230,11 @@
 <div id="cal-panel">
   <h3>Debug</h3>
   <div class="cal-row">
+    <label>Belt speed <span class="v" id="cal-belt-speed-v">11</span></label>
+    <input id="cal-belt-speed" type="range" min="0" max="100" step="1" value="11">
+    <div class="hint">Conveyor scroll speed (0 = paused). 11&nbsp;≈ one slot every 1.5&nbsp;s at 60&nbsp;fps.</div>
+  </div>
+  <div class="cal-row">
     <label>Bucket radius <span class="v" id="cal-radius-v">8</span></label>
     <input id="cal-radius" type="range" min="1" max="20" step="1" value="8">
     <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
