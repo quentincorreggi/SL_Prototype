@@ -54,6 +54,7 @@ function hookGlobalSlider(id, globalName, onChange) {
 (function bindDebugSliders() {
   hookGlobalSlider('cal-radius',  'ATTRACT_RADIUS_CELLS');
   hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
+  hookGlobalSlider('cal-batch',   'ATTRACT_BATCH');
   // Subdivision slider — display as "N×N" and refresh the editor's
   // capacity totals (each pixel becomes N² grains).
   var subEl = document.getElementById('cal-subdiv');
