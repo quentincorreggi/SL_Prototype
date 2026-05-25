@@ -380,12 +380,12 @@ function drawJumpers() {
 function drawTrails() {
   for (var i = 0; i < attractionTrails.length; i++) {
     var t = attractionTrails[i];
-    var slot = t.slot;
-    var bpos = getBeltSlotPos(slot);
     var p = t.t / t.dur;
-    // Arc the trail upward in the middle
-    var x = t.fromX + (bpos.x - t.fromX) * p;
-    var y = t.fromY + (bpos.y - t.fromY) * p - 50 * S * Math.sin(p * Math.PI);
+    // Arc the trail upward in the middle. Destination is snapshotted at
+    // spawn (toX, toY) so the grain never warps even if the bucket has
+    // since scrolled, wrapped, or popped.
+    var x = t.fromX + (t.toX - t.fromX) * p;
+    var y = t.fromY + (t.toY - t.fromY) * p - 50 * S * Math.sin(p * Math.PI);
     var c = COLORS[t.ci];
     ctx.save();
     ctx.shadowColor = c.glow;
@@ -397,8 +397,8 @@ function drawTrails() {
     // Trailing tail (3 ghost dots)
     for (var k = 1; k < 4; k++) {
       var pk = Math.max(0, p - k * 0.05);
-      var tx = t.fromX + (bpos.x - t.fromX) * pk;
-      var ty = t.fromY + (bpos.y - t.fromY) * pk - 50 * S * Math.sin(pk * Math.PI);
+      var tx = t.fromX + (t.toX - t.fromX) * pk;
+      var ty = t.fromY + (t.toY - t.fromY) * pk - 50 * S * Math.sin(pk * Math.PI);
       ctx.globalAlpha = 0.45 - k * 0.12;
       ctx.beginPath();
       ctx.arc(tx, ty, 2.5 * S * (1 - 0.3 * pk), 0, Math.PI * 2);

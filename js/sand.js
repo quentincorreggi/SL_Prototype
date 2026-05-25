@@ -77,6 +77,28 @@ function findNearestGrain(cx, cy, ci, maxR) {
   return { x: bestX, y: bestY, dist: Math.sqrt(bestD2) };
 }
 
+// Find up to `maxN` grains of color ci within `maxR` sand-cells of (cx, cy),
+// nearest first. Used to pull every grain currently in range as a batch.
+function findGrainsInRadius(cx, cy, ci, maxR, maxN) {
+  var out = [];
+  var minX = Math.max(0, Math.floor(cx - maxR));
+  var maxX = Math.min(SAND_W - 1, Math.ceil(cx + maxR));
+  var minY = Math.max(0, Math.floor(cy - maxR));
+  var maxY = Math.min(SAND_H - 1, Math.ceil(cy + maxR));
+  var r2 = maxR * maxR;
+  for (var y = minY; y <= maxY; y++) {
+    for (var x = minX; x <= maxX; x++) {
+      if (sandGrid[sandIdx(x, y)] !== ci) continue;
+      var dx = x - cx, dy = y - cy;
+      var d2 = dx * dx + dy * dy;
+      if (d2 <= r2) out.push({ x: x, y: y, d2: d2 });
+    }
+  }
+  out.sort(function (a, b) { return a.d2 - b.d2; });
+  if (maxN != null && out.length > maxN) out.length = maxN;
+  return out;
+}
+
 function paintGrain(x, y, ci) {
   if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) return;
   sandGrid[sandIdx(x, y)] = ci;
