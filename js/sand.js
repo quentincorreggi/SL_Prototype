@@ -1,98 +1,73 @@
 // ============================================================
-// sand.js — sand image + horizontally-blended gravity CA
+// sand.js — sand image + falling CA with centre-biased slip
 // ============================================================
 //
 // Stored in `sandGrid` (Int8Array). Each cell holds a color index
 // (0..NUM_COLORS-1) or -1 for empty.
 //
-// Gravity always has a +1 vertical component, but the horizontal
-// component varies along the x axis:
-//   - At the far left and far right of the image: no horizontal pull
-//     (gravity is purely vertical → no sand "flying" along the floor).
-//   - Towards the centre column: gravity bends progressively toward
-//     the bottom-centre point.
+// Per cell, in order:
+//   1. Try to fall straight down (vertical gravity for everyone).
+//   2. If down is blocked, try a diagonal slip — biased toward the
+//      bottom-centre of the image (slip-toward-centre first, then
+//      slip-away if that's blocked too).
+//   3. Otherwise stay.
 //
-// Implementation: a per-column blend factor t (0 at the edges, 1 at
-// the centre column) sets how often a cell takes a sideways step.
-//   period = round(1 / t)        // cells near centre: 1 tick
-//                                // halfway out:        ~2 ticks
-//                                // edge cells:         never
-// A per-cell offset desynchronises neighbours so they don't all drift
-// on the same frame.
+// Effect: sand falls straight down (no horizontal drift while in
+// free space, so no funnelling through the centre column). When it
+// lands on a pile it slumps toward the centre, so the pile builds up
+// at the bottom middle with natural slopes on either side. Edge cells
+// behave like normal falling sand — gravity is purely vertical there.
 //
-// Iteration order: bottom-up, with a tick-parity-driven L/R sweep so
-// horizontal slips don't build a one-sided bias.
+// Iteration: bottom-up rows, tick-parity decides L→R vs R→L sweep.
 // ============================================================
 
 function updateSand() {
   var cx = SAND_W / 2 - 0.5;
-  var cy = SAND_H - 1;
-  for (var y = SAND_H - 1; y >= 0; y--) {
+  for (var y = SAND_H - 2; y >= 0; y--) {
     var leftFirst = ((tick + y) & 1) === 0;
     if (leftFirst) {
-      for (var x = 0; x < SAND_W; x++) processSandCell(x, y, cx, cy);
+      for (var x = 0; x < SAND_W; x++) processSandCell(x, y, cx);
     } else {
-      for (var x = SAND_W - 1; x >= 0; x--) processSandCell(x, y, cx, cy);
+      for (var x = SAND_W - 1; x >= 0; x--) processSandCell(x, y, cx);
     }
   }
 }
 
-function processSandCell(x, y, cx, cy) {
+function processSandCell(x, y, cx) {
   var idx = sandIdx(x, y);
   if (sandGrid[idx] < 0) return;
   var ci = sandGrid[idx];
 
-  // Vertical pull is always +1 (cy is the bottom row).
-  var sy = y < cy ? 1 : 0;
+  // 1. Straight down
+  var belowIdx = sandIdx(x, y + 1);
+  if (sandGrid[belowIdx] < 0) {
+    sandGrid[belowIdx] = ci;
+    sandGrid[idx] = -1;
+    return;
+  }
 
-  // Horizontal pull: only fires periodically. The closer x is to the
-  // centre column, the more often it fires. Edges never fire.
-  var sx = 0;
+  // 2. Slip — prefer the direction that points toward the centre.
   var ddx = cx - x;
-  if (ddx > 0.5 || ddx < -0.5) {
-    var halfW = (SAND_W - 1) / 2;
-    var t = 1 - Math.abs(x - cx) / halfW;   // 0 at edges, ~1 at centre
-    if (t > 0.05) {
-      var period = Math.max(1, Math.round(1 / t));
-      // Per-cell offset so neighbours stagger their drift frames.
-      var offset = ((x * 7) ^ (y * 13)) & 0xff;
-      if (((tick + offset) % period) === 0) {
-        sx = ddx > 0 ? 1 : -1;
-      }
-    }
-  }
-
-  if (sx === 0 && sy === 0) return;
-
-  // Up to 3 candidate (dx, dy) pairs, primary first.
-  var dx0, dy0, dx1, dy1, dx2, dy2, nCands;
-  if (sx !== 0 && sy !== 0) {
-    // Diagonal step this tick
-    dx0 = sx; dy0 = sy;
-    dx1 = sx; dy1 = 0;
-    dx2 = 0;  dy2 = sy;
-    nCands = 3;
-  } else if (sy !== 0) {
-    // Pure vertical — try down, then symmetric down-slip
-    dx0 = 0; dy0 = sy;
-    if ((tick + y) & 1) { dx1 =  1; dy1 = sy; dx2 = -1; dy2 = sy; }
-    else                { dx1 = -1; dy1 = sy; dx2 =  1; dy2 = sy; }
-    nCands = 3;
+  var slipFirst, slipSecond;
+  if (ddx > 0.5) {
+    slipFirst = 1;  slipSecond = -1;
+  } else if (ddx < -0.5) {
+    slipFirst = -1; slipSecond = 1;
   } else {
-    // Pure horizontal — bottom row only, no up-climb
-    dx0 = sx; dy0 = 0;
-    nCands = 1;
+    // Centre column: no centre-bias, alternate by parity to stay symmetric.
+    if ((tick + y) & 1) { slipFirst = 1;  slipSecond = -1; }
+    else                { slipFirst = -1; slipSecond = 1;  }
   }
 
-  for (var i = 0; i < nCands; i++) {
-    var dx_ = i === 0 ? dx0 : (i === 1 ? dx1 : dx2);
-    var dy_ = i === 0 ? dy0 : (i === 1 ? dy1 : dy2);
-    var nx = x + dx_;
-    var ny = y + dy_;
-    if (nx < 0 || nx >= SAND_W || ny < 0 || ny >= SAND_H) continue;
-    var nidx = sandIdx(nx, ny);
-    if (sandGrid[nidx] >= 0) continue;
-    sandGrid[nidx] = ci;
+  var nx = x + slipFirst;
+  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
+    sandGrid[sandIdx(nx, y + 1)] = ci;
+    sandGrid[idx] = -1;
+    return;
+  }
+  nx = x + slipSecond;
+  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
+    sandGrid[sandIdx(nx, y + 1)] = ci;
     sandGrid[idx] = -1;
     return;
   }
