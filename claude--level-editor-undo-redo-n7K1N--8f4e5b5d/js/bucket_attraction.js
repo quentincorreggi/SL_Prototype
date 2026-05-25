@@ -79,14 +79,33 @@ function spawnAttractionTrail(sandX, sandY, slot, ci) {
 function updateAttractionTrails() {
   for (var i = attractionTrails.length - 1; i >= 0; i--) {
     var t = attractionTrails[i];
+
+    // Steer the trail toward the bucket's CURRENT position each frame
+    // so the grain always heads for the centre even as the belt scrolls.
+    // If the bucket teleports (belt wrap, pop), keep the previous
+    // destination so the grain doesn't fly across the screen.
+    var bpos = null;
+    for (var s = 0; s < BELT_SLOTS; s++) {
+      if (beltSlots[s] === t.bucketRef) { bpos = getBeltSlotPos(s); break; }
+    }
+    if (bpos && L.belt) {
+      var slotW = L.belt.w / BELT_SLOTS;
+      var ddx = bpos.x - t.toX;
+      var ddy = bpos.y - t.toY;
+      if (ddx * ddx + ddy * ddy < slotW * slotW) {
+        t.toX = bpos.x;
+        t.toY = bpos.y;
+      }
+    }
+
     t.t++;
     if (t.t >= t.dur) {
       // Arrival: credit by bucket identity (slot may have shifted on
       // belt wrap). Otherwise the grain is silently dropped — it was
       // already extracted from the image and should never re-appear.
       var b = null;
-      for (var s = 0; s < BELT_SLOTS; s++) {
-        if (beltSlots[s] === t.bucketRef) { b = beltSlots[s]; break; }
+      for (var s2 = 0; s2 < BELT_SLOTS; s2++) {
+        if (beltSlots[s2] === t.bucketRef) { b = beltSlots[s2]; break; }
       }
       if (b && !b.done) {
         b.fill = (b.fill || 0) + 1;
