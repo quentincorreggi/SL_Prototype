@@ -191,7 +191,8 @@ function edBuildToolbar() {
         var btn = document.createElement('button');
         btn.className = 'ed-tool' + (edColor === ci ? ' active' : '');
         btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
-        btn.textContent = CLR_NAMES[ci][0].toUpperCase();
+        btn.title = CLR_NAMES[ci];
+        btn.textContent = '';
         btn.onclick = function () { edColor = ci; edBuildToolbar(); };
         clrRow.appendChild(btn);
       });
@@ -209,7 +210,8 @@ function edBuildSandToolbar() {
     var btn = document.createElement('button');
     btn.className = 'ed-tool' + (edSandTool === ci ? ' active' : '');
     btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
-    btn.textContent = CLR_NAMES[ci][0].toUpperCase();
+    btn.title = CLR_NAMES[ci];
+    btn.textContent = '';
     (function (idx) { btn.onclick = function () { edSandTool = idx; edBuildSandToolbar(); }; })(ci);
     tb.appendChild(btn);
   }
@@ -394,8 +396,8 @@ function edShowTunnelPanel(idx) {
     btn.style.background = item.type === 'hidden'
       ? 'linear-gradient(135deg,#5A5460,#2A2530)'
       : 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
-    btn.textContent = item.type === 'hidden' ? '?' : CLR_NAMES[item.ci][0].toUpperCase();
-    btn.title = 'Click to remove';
+    btn.textContent = item.type === 'hidden' ? '?' : '';
+    btn.title = CLR_NAMES[item.ci] + ' — click to remove';
     btn.onclick = function () { t.contents.splice(i, 1); edShowTunnelPanel(idx); edBuildGrid(); edRefreshLiveSections(); };
     contentsList.appendChild(btn);
   });
@@ -421,7 +423,8 @@ function edShowTunnelPanel(idx) {
       var btn = document.createElement('button');
       btn.className = 'ed-tunnel-add-clr';
       btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
-      btn.textContent = type === 'hidden' ? '?' : CLR_NAMES[ci][0].toUpperCase();
+      btn.textContent = type === 'hidden' ? '?' : '';
+      btn.title = CLR_NAMES[ci];
       btn.onclick = function () {
         if (!t.contents) t.contents = [];
         t.contents.push({ type: type, ci: ci });
