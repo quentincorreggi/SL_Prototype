@@ -42,8 +42,9 @@ into that level — no editor or JSON pasting needed.
    - `name`: A clear, human-readable name for the mechanic
    - `description`: 1-2 sentences explaining the mechanic in plain language
    - `howToPlay`: Step-by-step instructions for the showcase level (e.g.,
-     "Tap the green boxes first to crack the adjacent ice, then tap the
-     revealed boxes to sort the marbles")
+     "Tap the green buckets first; once they're on the belt they'll pull
+     the green sand from the image — keep buckets moving until everything
+     is collected")
    - `author`: Ask the user if not obvious from context
    - `showcaseLevel`: The level JSON object (not stringified — embedded directly)
 
@@ -58,11 +59,11 @@ into that level — no editor or JSON pasting needed.
 7. **Construct the preview URL** using the pattern from CLAUDE.md:
    - Get SHA: `git rev-parse --short=8 HEAD`
    - Branch name with `/` replaced by `--`
-   - URL: `https://quentincorreggi.github.io/MS_Phaty/<branch>--<sha>/`
+   - URL: `https://quentincorreggi.github.io/SL_Prototype/<branch>--<sha>/`
 
 8. **Share with the user.** Provide:
    - The preview URL (playable link with showcase level)
-   - The landing page URL: `https://quentincorreggi.github.io/MS_Phaty/`
+   - The landing page URL: `https://quentincorreggi.github.io/SL_Prototype/`
    - Confirm the prototype will appear on the landing page after deploy (~30-60s)
    - Remind the user they can share just the landing page URL with the team —
      everyone can browse and play all shared prototypes from there

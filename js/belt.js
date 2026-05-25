@@ -1,36 +1,90 @@
 // ============================================================
-// belt.js — Belt slot initialization and position helpers
+// belt.js — 5-slot wrapping conveyor
+// ============================================================
+//
+// Belt scrolls right → left at BELT_SPEED slot-fractions per frame.
+// `beltOffset` accumulates 0..1; when it crosses 1, contents shift one
+// slot left (slot 0 wraps to slot BELT_SLOTS-1).
+//
+// Slot contents are bucket-on-belt objects:
+//   { type: 'default'|'hidden', ci, fill, pullCooldown, done, popT,
+//     bornAt, revealT }
+//
+// Reserved placeholder during jumper flight:
+//   { reserved: true }   (so firstFreeBeltSlot won't reuse it)
 // ============================================================
 
-function initBeltSlots() {
-  beltSlots = [];
-  for (var i = 0; i < BELT_SLOTS; i++) beltSlots.push({ marble: -1, arriveAnim: 0 });
+function initBelt() {
+  beltSlots = new Array(BELT_SLOTS);
+  for (var i = 0; i < BELT_SLOTS; i++) beltSlots[i] = null;
   beltOffset = 0;
 }
 
-function getSlotPos(i) {
-  var t = ((i / BELT_SLOTS) + beltOffset) % 1;
-  t = ((t % 1) + 1) % 1;
-  var idx = t * beltPath.length;
-  var i0 = Math.floor(idx) % beltPath.length;
-  var i1 = (i0 + 1) % beltPath.length;
-  var f = idx - Math.floor(idx);
-  return {
-    x: beltPath[i0].x + (beltPath[i1].x - beltPath[i0].x) * f,
-    y: beltPath[i0].y + (beltPath[i1].y - beltPath[i0].y) * f
-  };
-}
-
-function getSlotT(i) {
-  return ((i / BELT_SLOTS) + beltOffset) % 1;
-}
-
-function getBeltEntryT() {
-  var best = 0, bd = Infinity;
-  for (var i = 0; i < beltPath.length; i++) {
-    var dx = beltPath[i].x - L.beltCx, dy = beltPath[i].y - L.beltTopY;
-    var d2 = dx * dx + dy * dy;
-    if (d2 < bd) { bd = d2; best = i; }
+function updateBelt() {
+  // Pause scrolling while a bucket is jumping onto the belt — otherwise
+  // its reserved slot would shift mid-flight and the bucket would land
+  // in the wrong slot.
+  if (jumpers.length === 0) {
+    beltOffset += BELT_SPEED;
+    while (beltOffset >= 1) {
+      beltOffset -= 1;
+      // Right→left scroll: shift contents one slot left, slot 0 wraps to last.
+      var first = beltSlots[0];
+      for (var i = 0; i < BELT_SLOTS - 1; i++) beltSlots[i] = beltSlots[i + 1];
+      beltSlots[BELT_SLOTS - 1] = first;
+    }
   }
-  return best / beltPath.length;
+
+  // Tick down pop animations; clear when finished.
+  for (var s = 0; s < BELT_SLOTS; s++) {
+    var b = beltSlots[s];
+    if (!b || b.reserved) continue;
+    if (b.done) {
+      b.popT = (b.popT || 0) + 1;
+      if (b.popT === 1) {
+        if (typeof sfx !== 'undefined') sfx.pop();
+        if (typeof spawnBurst === 'function') {
+          var pos = getBeltSlotPos(s);
+          spawnBurst(pos.x, pos.y, COLORS[b.ci].fill, 14);
+        }
+      }
+      if (b.popT >= BUCKET_POP_FRAMES) {
+        beltSlots[s] = null;
+      }
+    }
+    if (b && b.revealT != null && b.revealT < 12) b.revealT++;
+  }
+}
+
+function firstFreeBeltSlot() {
+  // Right-most free slot first — newly-tapped buckets enter on the right
+  // and ride leftward.
+  for (var i = BELT_SLOTS - 1; i >= 0; i--) {
+    if (beltSlots[i] == null) return i;
+  }
+  return -1;
+}
+
+function countBucketsOnBelt() {
+  var n = 0;
+  for (var i = 0; i < BELT_SLOTS; i++) {
+    var b = beltSlots[i];
+    if (b && !b.reserved && !b.done) n++;
+  }
+  return n;
+}
+
+function getBeltSlotPos(i) {
+  var slotW = L.belt.w / BELT_SLOTS;
+  var x = L.belt.x + slotW * (i + 0.5 - beltOffset);
+  var y = L.belt.y + L.belt.h / 2;
+  return { x: x, y: y };
+}
+
+function getBeltSlotSandPos(i) {
+  // Project slot center onto sand-image x-axis; y = just below the image.
+  var pos = getBeltSlotPos(i);
+  var sx = (pos.x - L.image.x) / L.image.cell;
+  var sy = SAND_H - 0.5;
+  return { x: sx, y: sy };
 }
