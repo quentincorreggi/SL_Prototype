@@ -36,7 +36,32 @@ function initGame(levelData) {
     }
   }
 
+  // Capacities are derived from sand and buckets together; computed once.
+  computeLevelCapacities();
   updateBucketActivation();
+}
+
+function computeLevelCapacities() {
+  var sandPer = new Array(NUM_COLORS);
+  var bktPer  = new Array(NUM_COLORS);
+  for (var ci = 0; ci < NUM_COLORS; ci++) { sandPer[ci] = 0; bktPer[ci] = 0; }
+  for (var i = 0; i < sandGrid.length; i++) {
+    var c = sandGrid[i];
+    if (c >= 0 && c < NUM_COLORS) sandPer[c]++;
+  }
+  for (var i = 0; i < stock.length; i++) {
+    var cell = stock[i];
+    if (!cell) continue;
+    if (cell.kind === 'bucket') bktPer[cell.ci]++;
+    else if (cell.kind === 'tunnel' && cell.contents) {
+      for (var k = 0; k < cell.contents.length; k++) bktPer[cell.contents[k].ci]++;
+    }
+  }
+  for (var ci = 0; ci < NUM_COLORS; ci++) {
+    levelCapacities[ci] = (bktPer[ci] > 0 && sandPer[ci] > 0)
+      ? Math.ceil(sandPer[ci] / bktPer[ci])
+      : 0;
+  }
 }
 
 function cloneCell(src) {
@@ -202,6 +227,7 @@ function makeBeltBucket(type, ci) {
     type: type || 'default',
     ci: ci | 0,
     fill: 0,
+    capacity: levelCapacities[ci | 0] || 0,
     pullCooldown: ATTRACT_PULL_FRAMES,
     done: false,
     popT: 0,
@@ -243,9 +269,30 @@ function update() {
   if (tick % 2 === 0) updateSand(); // CA at half framerate looks calmer
   updateBucketAttraction();
   updateAttractionTrails();
+  updateColorDepletion();
   if (typeof tickParticles === 'function') tickParticles();
 
   checkWin();
+}
+
+// If a color's sand is exhausted (and nothing in flight), any bucket of that
+// color sitting on the belt is marked done so it pops — otherwise a partially
+// filled "last" bucket would sit forever.
+function updateColorDepletion() {
+  var hasSand = new Array(NUM_COLORS);
+  for (var ci = 0; ci < NUM_COLORS; ci++) hasSand[ci] = false;
+  for (var i = 0; i < sandGrid.length; i++) {
+    var c = sandGrid[i];
+    if (c >= 0) hasSand[c] = true;
+  }
+  for (var t = 0; t < attractionTrails.length; t++) {
+    hasSand[attractionTrails[t].ci] = true;
+  }
+  for (var s = 0; s < BELT_SLOTS; s++) {
+    var b = beltSlots[s];
+    if (!b || b.reserved || b.done) continue;
+    if (!hasSand[b.ci]) b.done = true;
+  }
 }
 
 function checkWin() {

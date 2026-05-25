@@ -174,12 +174,12 @@ function drawBeltBucket(s, b) {
     ctx.globalAlpha = 1 - revealAlpha;
     hidden.drawActive(ctx, x, y, w, h, displayCi, S, tick, 0);
     ctx.globalAlpha = revealAlpha;
-    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, BUCKET_CAPACITY);
+    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, b.capacity || 0);
     ctx.globalAlpha = 1;
   } else {
     var w = size * scale, h = size * scale;
     var x = pos.x - w / 2, y = pos.y - h / 2;
-    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, BUCKET_CAPACITY);
+    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, b.capacity || 0);
   }
   ctx.restore();
 }
@@ -368,7 +368,7 @@ function drawJumpers() {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
-    drawJar(ctx, -size / 2, -size / 2, size, size, j.bucket.ci, S, 0, BUCKET_CAPACITY);
+    drawJar(ctx, -size / 2, -size / 2, size, size, j.bucket.ci, S, 0, j.bucket.capacity || 0);
     ctx.restore();
   }
 }

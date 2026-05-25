@@ -7,8 +7,9 @@
 //   - when ready, find nearest matching grain in radius and pull it
 //   - extracted grain immediately leaves sandGrid (sand above starts to
 //     fall next CA tick); a visual trail flies to the bucket
-//   - on trail arrival, bucket.fill++. When fill === BUCKET_CAPACITY, the
-//     bucket is marked done — belt update will pop it next frame.
+//   - on trail arrival, bucket.fill++. When fill === bucket.capacity, the
+//     bucket is marked done — belt update will pop it next frame. Capacity
+//     is per-color (see game.js#computeLevelCapacities).
 // ============================================================
 
 function updateBucketAttraction() {
@@ -16,13 +17,14 @@ function updateBucketAttraction() {
     var b = beltSlots[i];
     if (!b || b.reserved || b.done) continue;
     if (b.pullCooldown > 0) { b.pullCooldown--; continue; }
-    if ((b.fill || 0) >= BUCKET_CAPACITY) continue;
+    if ((b.capacity || 0) <= 0) continue;
+    if ((b.fill || 0) >= b.capacity) continue;
     // Count en-route trails so we don't over-pull and exceed capacity.
     var enRoute = 0;
     for (var t = 0; t < attractionTrails.length; t++) {
       if (attractionTrails[t].slot === i) enRoute++;
     }
-    if ((b.fill || 0) + enRoute >= BUCKET_CAPACITY) continue;
+    if ((b.fill || 0) + enRoute >= b.capacity) continue;
 
     var sp = getBeltSlotSandPos(i);
     var grain = findNearestGrain(sp.x, sp.y, b.ci, ATTRACT_RADIUS_CELLS);
@@ -59,7 +61,7 @@ function updateAttractionTrails() {
       var b = beltSlots[slot];
       if (b && b === t.bucketRef && !b.done) {
         b.fill = (b.fill || 0) + 1;
-        if (b.fill >= BUCKET_CAPACITY) {
+        if (b.capacity > 0 && b.fill >= b.capacity) {
           b.done = true;
         }
       } else {
