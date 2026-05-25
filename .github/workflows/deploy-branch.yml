@@ -1,0 +1,164 @@
+name: Deploy branch to GitHub Pages
+
+on:
+  push:
+    branches:
+      - '**'
+  delete:
+
+# Serialize all deploys to gh-pages to prevent race conditions.
+concurrency:
+  group: deploy-gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout pushed branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout or create gh-pages branch
+        run: |
+          if git ls-remote --exit-code origin gh-pages >/dev/null 2>&1; then
+            git worktree add gh-pages origin/gh-pages
+          else
+            git worktree add --detach gh-pages
+            cd gh-pages
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan gh-pages
+            git rm -rf .
+            touch .nojekyll
+            echo '<!DOCTYPE html><html><head><title>MS_Phaty Previews</title></head><body><h1>MS_Phaty Branch Previews</h1><p>Previews are at /&lt;branch-name&gt;--&lt;sha&gt;/</p></body></html>' > index.html
+            echo '{"prototypes":[]}' > manifest.json
+            git add .nojekyll index.html manifest.json
+            git commit -m "Initialize gh-pages branch"
+            git push -u origin gh-pages
+          fi
+
+      - name: Compute folder names
+        id: folder
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          FOLDER=$(echo "$BRANCH" | sed 's|/|--|g')
+          SHORT_SHA="${GITHUB_SHA:0:8}"
+          VERSIONED="$FOLDER--$SHORT_SHA"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "folder=$FOLDER" >> "$GITHUB_OUTPUT"
+          echo "versioned=$VERSIONED" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Remove previous versions of this branch
+        run: |
+          FOLDER="${{ steps.folder.outputs.folder }}"
+          shopt -s nullglob
+          for old in gh-pages/${FOLDER}--*; do
+            rm -rf "$old"
+          done
+
+      - name: Copy branch files to versioned gh-pages subfolder
+        run: |
+          VERSIONED="${{ steps.folder.outputs.versioned }}"
+          mkdir -p "gh-pages/$VERSIONED"
+          rsync -a --exclude='.git' --exclude='gh-pages' --exclude='.github' ./ "gh-pages/$VERSIONED/"
+
+      - name: Update landing page
+        run: |
+          if [ -f landing.html ]; then
+            cp landing.html gh-pages/index.html
+          fi
+
+      - name: Regenerate manifest.json
+        run: |
+          cd gh-pages
+          echo '{"prototypes":[' > manifest.json
+          first=true
+          shopt -s nullglob
+          for dir in */; do
+            dir="${dir%/}"
+            case "$dir" in *--*) ;; *) continue ;; esac
+            sha="${dir##*--}"
+            prefix="${dir%--*}"
+            branch=$(echo "$prefix" | sed 's|--|/|g')
+            deployed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            if [ "$first" = true ]; then first=false; else printf ',' >> manifest.json; fi
+            printf '{"folder":"%s","branch":"%s","sha":"%s","deployedAt":"%s"}' \
+              "$dir" "$branch" "$sha" "$deployed_at" >> manifest.json
+          done
+          echo ']}' >> manifest.json
+
+      - name: Commit and push to gh-pages
+        run: |
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to deploy"
+          else
+            git commit -m "Deploy ${{ steps.folder.outputs.branch }} @ ${{ steps.folder.outputs.short_sha }}"
+            git push origin HEAD:gh-pages
+          fi
+
+  cleanup:
+    if: github.event_name == 'delete' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Compute folder prefix
+        id: folder
+        run: |
+          BRANCH="${{ github.event.ref }}"
+          FOLDER=$(echo "$BRANCH" | sed 's|/|--|g')
+          echo "folder=$FOLDER" >> "$GITHUB_OUTPUT"
+
+      - name: Remove all versioned folders for this branch
+        run: |
+          FOLDER="${{ steps.folder.outputs.folder }}"
+          shopt -s nullglob
+          removed=0
+          for dir in ${FOLDER}--*; do
+            rm -rf "$dir"
+            removed=1
+          done
+          echo "removed=$removed" >> "$GITHUB_OUTPUT"
+        id: remove
+
+      - name: Regenerate manifest.json
+        if: steps.remove.outputs.removed == '1'
+        run: |
+          echo '{"prototypes":[' > manifest.json
+          first=true
+          shopt -s nullglob
+          for dir in */; do
+            dir="${dir%/}"
+            case "$dir" in *--*) ;; *) continue ;; esac
+            sha="${dir##*--}"
+            prefix="${dir%--*}"
+            branch=$(echo "$prefix" | sed 's|--|/|g')
+            deployed_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            if [ "$first" = true ]; then first=false; else printf ',' >> manifest.json; fi
+            printf '{"folder":"%s","branch":"%s","sha":"%s","deployedAt":"%s"}' \
+              "$dir" "$branch" "$sha" "$deployed_at" >> manifest.json
+          done
+          echo ']}' >> manifest.json
+
+      - name: Commit and push cleanup
+        if: steps.remove.outputs.removed == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Clean up deployments for ${{ steps.folder.outputs.folder }} (branch deleted)"
+          git push
