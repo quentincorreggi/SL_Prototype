@@ -1,17 +1,19 @@
 // ============================================================
-// editor.js — Level editor
+// editor.js — Level editor (full-screen, two panes)
 // ============================================================
-// Owns the editor UI:
-//   - 32×32 sand image painter   (top — paint first)
-//   - Per-color capacity panel   (live readout: buckets × capacity = total)
-//   - 7×7 grid painter           (bucket colors restricted to sand colors)
+// LEFT pane  — Sand Image (32×32) with tool sidebar:
+//   - Tools: brush, eraser, fill, rect, ellipse, line
+//   - Brush size (1–4)
+//   - Color palette (2-column grid of 12 swatches)
+// RIGHT pane — Bucket Grid (7×7):
+//   - Live per-color capacity chips
+//   - Type tabs (Bucket/Hidden/Tunnel/Wall/Erase) + color row
+//     (color row restricted to colors present in the sand image)
 //   - Tunnel sub-panel
-//   - Test Play handoff to game.js
-//   - Export / Import JSON
 //
-// Rule (per spec): bucket capacity is derived, not fixed —
+// Capacity rule (from CLAUDE.md):
 //   capacity[ci] = ceil(totalSandOfColor[ci] / totalBucketsOfColor[ci])
-// Every color present in the sand image must have at least one bucket.
+// Test Play is blocked if any sand color has no bucket.
 // ============================================================
 
 var edLevel = {
@@ -21,24 +23,42 @@ var edLevel = {
   sandImage: new Array(SAND_W * SAND_H)
 };
 
+// --- Bucket-grid state ---
 var edTool = 'default';     // 'default' | 'hidden' | 'tunnel' | 'wall' | 'erase'
-var edColor = 0;            // selected color index (constrained to available)
-var edSandTool = 0;         // selected sand color (or -1 for erase)
-var edSelectedTunnel = -1;  // grid index of currently-edited tunnel
+var edColor = 0;            // selected bucket color (constrained to available)
+var edSelectedTunnel = -1;
+
+// --- Sand-image state ---
+var edSandMode = 'brush';   // 'brush' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line'
+var edSandTool = 0;         // selected color
+var edBrushSize = 1;
+var edSandCells = [];       // cached <div> elements per sand cell
+
+// --- Drag state (sand image) ---
+var edDragging = false;
+var edDragMode = null;
+var edDragStart = null;     // {x, y} in sand-cell coords
+var edDragLast = null;      // last point for brush stroke interpolation
+var edSnapshot = null;      // sandImage array snapshot at drag start (for shape tools)
+
+// --- Initialization state ---
+var edInitialized = false;
+var edPlayingFromEditor = false;
 
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
-  edBuildSandToolbar();
+  edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
   edBuildGrid();
+  edBindSandPointer();
   edRefreshLiveSections();
   edHideTunnelPanel();
 }
 
 // ============================================================
-// Live recompute — capacities, validation, displays
+// Counts / capacities / validation
 // ============================================================
 
 function edComputeCounts() {
@@ -61,7 +81,6 @@ function edComputeCounts() {
 }
 
 function edAvailableColors() {
-  // Colors that have at least one sand grain in the image.
   var stats = edComputeCounts();
   var out = [];
   for (var ci = 0; ci < NUM_COLORS; ci++) {
@@ -86,7 +105,6 @@ function edRenderCapacities() {
   if (!el) return;
   var stats = edComputeCounts();
   el.innerHTML = '';
-
   var anyVisible = false;
   for (var ci = 0; ci < NUM_COLORS; ci++) {
     if (stats.sand[ci] === 0 && stats.bkt[ci] === 0) continue;
@@ -94,7 +112,6 @@ function edRenderCapacities() {
     var c = COLORS[ci];
     var s = stats.sand[ci], b = stats.bkt[ci];
     var cap = (s > 0 && b > 0) ? Math.ceil(s / b) : 0;
-
     var chip = document.createElement('div');
     chip.className = 'ed-cap-chip';
     var status = '';
@@ -113,11 +130,10 @@ function edRenderCapacities() {
       '<span class="ed-cap-info">' + status + '</span>';
     el.appendChild(chip);
   }
-
   if (!anyVisible) {
     var hint = document.createElement('div');
     hint.style.cssText = 'font-size:12px;color:#9C8A70;text-align:center;padding:6px';
-    hint.textContent = 'Paint sand above to see bucket capacities.';
+    hint.textContent = 'Paint sand to see bucket capacities.';
     el.appendChild(hint);
   }
 }
@@ -143,7 +159,315 @@ function edRefreshLiveSections() {
 }
 
 // ============================================================
-// Toolbars
+// Left pane — Tool sidebar
+// ============================================================
+
+var SAND_TOOLS = [
+  { id: 'brush',   icon: '✏', label: 'Brush' },
+  { id: 'eraser',  icon: '✕', label: 'Erase' },
+  { id: 'fill',    icon: '▣', label: 'Fill' },
+  { id: 'rect',    icon: '◻', label: 'Rect' },
+  { id: 'ellipse', icon: '○', label: 'Oval' },
+  { id: 'line',    icon: '╲', label: 'Line' }
+];
+var BRUSH_SIZES = [1, 2, 3, 4];
+
+function edBuildToolSidebar() {
+  var sb = document.getElementById('ed-tool-sidebar');
+  if (!sb) return;
+  sb.innerHTML = '';
+
+  // Tools
+  var toolLabel = document.createElement('div');
+  toolLabel.className = 'ed-tool-section-label';
+  toolLabel.textContent = 'Tools';
+  sb.appendChild(toolLabel);
+  SAND_TOOLS.forEach(function (t) {
+    var btn = document.createElement('button');
+    btn.className = 'ed-tool-btn' + (edSandMode === t.id ? ' active' : '');
+    btn.innerHTML = '<span class="ed-tool-icon">' + t.icon + '</span><span>' + t.label + '</span>';
+    btn.title = t.label;
+    btn.onclick = function () { edSandMode = t.id; edBuildToolSidebar(); };
+    sb.appendChild(btn);
+  });
+
+  // Brush size
+  var sizeLabel = document.createElement('div');
+  sizeLabel.className = 'ed-tool-section-label';
+  sizeLabel.textContent = 'Size';
+  sb.appendChild(sizeLabel);
+  var sizeRow = document.createElement('div');
+  sizeRow.className = 'ed-size-row';
+  BRUSH_SIZES.forEach(function (sz) {
+    var btn = document.createElement('button');
+    btn.className = 'ed-size-btn' + (edBrushSize === sz ? ' active' : '');
+    btn.title = 'Brush size ' + sz;
+    // Render a small dot whose size suggests the brush
+    var dot = document.createElement('span');
+    dot.className = 'ed-size-dot';
+    var dpx = 4 + sz * 2;
+    dot.style.width = dpx + 'px';
+    dot.style.height = dpx + 'px';
+    btn.appendChild(dot);
+    btn.onclick = function () { edBrushSize = sz; edBuildToolSidebar(); };
+    sizeRow.appendChild(btn);
+  });
+  sb.appendChild(sizeRow);
+
+  // Colors (2-column grid)
+  var clrLabel = document.createElement('div');
+  clrLabel.className = 'ed-tool-section-label';
+  clrLabel.textContent = 'Colors';
+  sb.appendChild(clrLabel);
+  var clrGrid = document.createElement('div');
+  clrGrid.className = 'ed-color-grid';
+  for (var ci = 0; ci < NUM_COLORS; ci++) {
+    var c = COLORS[ci];
+    var btn = document.createElement('button');
+    btn.className = 'ed-tool' + (edSandTool === ci ? ' active' : '');
+    btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+    btn.title = CLR_NAMES[ci];
+    btn.textContent = '';
+    (function (idx) { btn.onclick = function () { edSandTool = idx; edBuildToolSidebar(); }; })(ci);
+    clrGrid.appendChild(btn);
+  }
+  sb.appendChild(clrGrid);
+}
+
+// ============================================================
+// Left pane — Sand image grid (built once, updated by style)
+// ============================================================
+
+function edBuildSandGrid() {
+  var g = document.getElementById('ed-sand-grid');
+  if (!g) return;
+  g.innerHTML = '';
+  edSandCells = [];
+  for (var i = 0; i < SAND_W * SAND_H; i++) {
+    var px = document.createElement('div');
+    px.className = 'ed-sand-px';
+    edApplySandCell(px, edLevel.sandImage[i]);
+    g.appendChild(px);
+    edSandCells.push(px);
+  }
+}
+
+function edRefreshSandGrid() {
+  if (edSandCells.length !== edLevel.sandImage.length) {
+    edBuildSandGrid();
+    return;
+  }
+  for (var i = 0; i < edSandCells.length; i++) {
+    edApplySandCell(edSandCells[i], edLevel.sandImage[i]);
+  }
+}
+
+function edApplySandCell(el, ci) {
+  if (ci == null || ci < 0) {
+    el.style.background = '#F4ECDB';
+  } else {
+    el.style.background = COLORS[ci].fill;
+  }
+}
+
+// Map a pointer event to sand-cell coords (clamped to bounds). Returns null
+// if outside the canvas.
+function pointerToSandCell(e) {
+  var g = document.getElementById('ed-sand-grid');
+  if (!g) return null;
+  var rect = g.getBoundingClientRect();
+  var cellW = rect.width / SAND_W;
+  var cellH = rect.height / SAND_H;
+  var x = Math.floor((e.clientX - rect.left) / cellW);
+  var y = Math.floor((e.clientY - rect.top) / cellH);
+  if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) return null;
+  return { x: x, y: y };
+}
+
+function edBindSandPointer() {
+  var g = document.getElementById('ed-sand-grid');
+  if (!g) return;
+  g.onpointerdown = onSandPointerDown;
+  g.onpointermove = onSandPointerMove;
+  g.onpointerup = onSandPointerUp;
+  g.onpointercancel = onSandPointerUp;
+  g.onpointerleave = function (e) { /* keep dragging via capture if set */ };
+  g.oncontextmenu = function (e) { e.preventDefault(); };
+}
+
+function onSandPointerDown(e) {
+  e.preventDefault();
+  var pt = pointerToSandCell(e);
+  if (!pt) return;
+  var g = document.getElementById('ed-sand-grid');
+  if (g.setPointerCapture) {
+    try { g.setPointerCapture(e.pointerId); } catch (_) { }
+  }
+  // Right-click forces eraser regardless of current tool
+  var rightClick = (e.button === 2 || e.buttons === 2);
+  var mode = rightClick ? 'eraser' : edSandMode;
+  var color = rightClick ? -1 : edSandTool;
+
+  edDragging = true;
+  edDragMode = mode;
+  edDragStart = pt;
+  edDragLast = pt;
+
+  if (mode === 'fill') {
+    floodFill(pt.x, pt.y, color);
+    edRefreshSandGrid();
+    edDragging = false; // single-shot
+    edOnSandChanged();
+    return;
+  }
+  if (mode === 'brush' || mode === 'eraser') {
+    paintBrush(pt.x, pt.y, mode === 'eraser' ? -1 : color, edBrushSize);
+    edRefreshSandGrid();
+    return;
+  }
+  if (mode === 'rect' || mode === 'ellipse' || mode === 'line') {
+    edSnapshot = edLevel.sandImage.slice();
+    if (mode === 'line') {
+      paintLine(pt.x, pt.y, pt.x, pt.y, color, edBrushSize);
+    } else if (mode === 'rect') {
+      drawRectShape(pt.x, pt.y, pt.x, pt.y, color);
+    } else {
+      drawEllipseShape(pt.x, pt.y, pt.x, pt.y, color);
+    }
+    edRefreshSandGrid();
+    return;
+  }
+}
+
+function onSandPointerMove(e) {
+  if (!edDragging) return;
+  var pt = pointerToSandCell(e);
+  if (!pt) return;
+
+  if (edDragMode === 'brush' || edDragMode === 'eraser') {
+    var color = edDragMode === 'eraser' ? -1 : edSandTool;
+    paintLine(edDragLast.x, edDragLast.y, pt.x, pt.y, color, edBrushSize);
+    edDragLast = pt;
+    edRefreshSandGrid();
+    return;
+  }
+  if (edDragMode === 'rect' || edDragMode === 'ellipse' || edDragMode === 'line') {
+    // Restore snapshot, then apply the shape from start to current pt
+    edLevel.sandImage = edSnapshot.slice();
+    var color = edSandTool;
+    if (edDragMode === 'rect') {
+      drawRectShape(edDragStart.x, edDragStart.y, pt.x, pt.y, color);
+    } else if (edDragMode === 'ellipse') {
+      drawEllipseShape(edDragStart.x, edDragStart.y, pt.x, pt.y, color);
+    } else {
+      paintLine(edDragStart.x, edDragStart.y, pt.x, pt.y, color, edBrushSize);
+    }
+    edRefreshSandGrid();
+    return;
+  }
+}
+
+function onSandPointerUp(e) {
+  if (!edDragging) return;
+  edDragging = false;
+  edDragMode = null;
+  edDragStart = null;
+  edDragLast = null;
+  edSnapshot = null;
+  edOnSandChanged();
+}
+
+// ============================================================
+// Painting tools (write to edLevel.sandImage)
+// ============================================================
+
+function paintBrush(cx, cy, ci, size) {
+  var halfL = Math.floor((size - 1) / 2);
+  var halfR = size - 1 - halfL;
+  for (var dy = -halfL; dy <= halfR; dy++) {
+    for (var dx = -halfL; dx <= halfR; dx++) {
+      var x = cx + dx, y = cy + dy;
+      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
+        edLevel.sandImage[y * SAND_W + x] = ci;
+      }
+    }
+  }
+}
+
+// Bresenham line with brush at each step
+function paintLine(x0, y0, x1, y1, ci, size) {
+  var dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  var sx = x0 < x1 ? 1 : -1;
+  var sy = y0 < y1 ? 1 : -1;
+  var err = dx - dy;
+  while (true) {
+    paintBrush(x0, y0, ci, size);
+    if (x0 === x1 && y0 === y1) break;
+    var e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx)  { err += dx; y0 += sy; }
+  }
+}
+
+// 4-connected flood fill
+function floodFill(sx, sy, ci) {
+  if (sx < 0 || sx >= SAND_W || sy < 0 || sy >= SAND_H) return;
+  var target = edLevel.sandImage[sy * SAND_W + sx];
+  if (target === ci) return;
+  var stack = [[sx, sy]];
+  while (stack.length > 0) {
+    var p = stack.pop();
+    var x = p[0], y = p[1];
+    if (x < 0 || x >= SAND_W || y < 0 || y >= SAND_H) continue;
+    var i = y * SAND_W + x;
+    if (edLevel.sandImage[i] !== target) continue;
+    edLevel.sandImage[i] = ci;
+    stack.push([x + 1, y]);
+    stack.push([x - 1, y]);
+    stack.push([x, y + 1]);
+    stack.push([x, y - 1]);
+  }
+}
+
+function drawRectShape(x0, y0, x1, y1, ci) {
+  var minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+  var minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+  for (var y = minY; y <= maxY; y++) {
+    for (var x = minX; x <= maxX; x++) {
+      if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
+        edLevel.sandImage[y * SAND_W + x] = ci;
+      }
+    }
+  }
+}
+
+function drawEllipseShape(x0, y0, x1, y1, ci) {
+  var minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+  var minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+  var cx = (minX + maxX) / 2;
+  var cy = (minY + maxY) / 2;
+  var rx = Math.max(0.5, (maxX - minX) / 2);
+  var ry = Math.max(0.5, (maxY - minY) / 2);
+  for (var y = minY; y <= maxY; y++) {
+    for (var x = minX; x <= maxX; x++) {
+      var dx = (x - cx) / rx;
+      var dy = (y - cy) / ry;
+      if (dx * dx + dy * dy <= 1.0) {
+        if (x >= 0 && x < SAND_W && y >= 0 && y < SAND_H) {
+          edLevel.sandImage[y * SAND_W + x] = ci;
+        }
+      }
+    }
+  }
+}
+
+function edOnSandChanged() {
+  edBuildToolbar();      // available bucket colors may have changed
+  edRefreshLiveSections();
+}
+
+// ============================================================
+// Right pane — Bucket grid toolbar
 // ============================================================
 
 function edBuildToolbar() {
@@ -174,13 +498,12 @@ function edBuildToolbar() {
   });
   tb.appendChild(typeRow);
 
-  // Color swatches — restricted to colors present in sand.
   if (edTool === 'default' || edTool === 'hidden') {
     var avail = edAvailableColors();
     if (avail.length === 0) {
       var msg = document.createElement('div');
       msg.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic;text-align:center;padding:4px';
-      msg.textContent = 'Paint sand above to unlock bucket colors';
+      msg.textContent = 'Paint sand first to unlock bucket colors';
       tb.appendChild(msg);
     } else {
       if (avail.indexOf(edColor) < 0) edColor = avail[0];
@@ -201,31 +524,8 @@ function edBuildToolbar() {
   }
 }
 
-function edBuildSandToolbar() {
-  var tb = document.getElementById('ed-sand-toolbar');
-  if (!tb) return;
-  tb.innerHTML = '';
-  for (var ci = 0; ci < NUM_COLORS; ci++) {
-    var c = COLORS[ci];
-    var btn = document.createElement('button');
-    btn.className = 'ed-tool' + (edSandTool === ci ? ' active' : '');
-    btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
-    btn.title = CLR_NAMES[ci];
-    btn.textContent = '';
-    (function (idx) { btn.onclick = function () { edSandTool = idx; edBuildSandToolbar(); }; })(ci);
-    tb.appendChild(btn);
-  }
-  var er = document.createElement('button');
-  er.className = 'ed-tool' + (edSandTool === -1 ? ' active' : '');
-  er.style.background = 'linear-gradient(135deg,#fff,#bbb)';
-  er.style.color = '#5A4A38';
-  er.textContent = '×';
-  er.onclick = function () { edSandTool = -1; edBuildSandToolbar(); };
-  tb.appendChild(er);
-}
-
 // ============================================================
-// Grid painter
+// Right pane — Bucket grid
 // ============================================================
 
 function edBuildGrid() {
@@ -302,54 +602,6 @@ function edPaintCell(idx, eraseOverride) {
   edSelectedTunnel = -1;
   edHideTunnelPanel();
   edBuildGrid();
-  edRefreshLiveSections();
-}
-
-// ============================================================
-// Sand image painter
-// ============================================================
-
-function edBuildSandGrid() {
-  var g = document.getElementById('ed-sand-grid');
-  if (!g) return;
-  g.innerHTML = '';
-  g.style.gridTemplateColumns = 'repeat(' + SAND_W + ',1fr)';
-  for (var i = 0; i < SAND_W * SAND_H; i++) {
-    var px = document.createElement('div');
-    px.className = 'ed-sand-px';
-    edApplySandCell(px, edLevel.sandImage[i]);
-    (function (idx, el) {
-      var paint = function (e) {
-        if (e && (e.buttons === 2 || e.button === 2)) edLevel.sandImage[idx] = -1;
-        else edLevel.sandImage[idx] = edSandTool;
-        edApplySandCell(el, edLevel.sandImage[idx]);
-        edOnSandChanged();
-      };
-      el.onmousedown = paint;
-      el.onmouseenter = function (e) { if (e.buttons === 1 || e.buttons === 2) paint(e); };
-      el.oncontextmenu = function (e) {
-        e.preventDefault();
-        edLevel.sandImage[idx] = -1;
-        edApplySandCell(el, edLevel.sandImage[idx]);
-        edOnSandChanged();
-      };
-      el.ontouchstart = function (e) { e.preventDefault(); paint({ buttons: 1 }); };
-    })(i, px);
-    g.appendChild(px);
-  }
-}
-
-function edApplySandCell(el, ci) {
-  if (ci == null || ci < 0) {
-    el.style.background = '#F4ECDB';
-  } else {
-    el.style.background = COLORS[ci].fill;
-  }
-}
-
-// Any change to sand may add/remove available colors and shift capacities.
-function edOnSandChanged() {
-  edBuildToolbar();    // available bucket colors may have changed
   edRefreshLiveSections();
 }
 
@@ -450,7 +702,7 @@ function edClearAll() {
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
   edHideTunnelPanel();
   edBuildGrid();
-  edBuildSandGrid();
+  edRefreshSandGrid();
   edBuildToolbar();
   edRefreshLiveSections();
 }
@@ -464,7 +716,7 @@ function edRandomSand() {
       edLevel.sandImage[y * SAND_W + x] = ci;
     }
   }
-  edBuildSandGrid();
+  edRefreshSandGrid();
   edOnSandChanged();
 }
 
@@ -473,7 +725,10 @@ function edRandomSand() {
 // ============================================================
 
 function showEditor() {
-  edInit();
+  if (!edInitialized) {
+    edInit();
+    edInitialized = true;
+  }
   var ls = document.getElementById('level-screen');
   var ed = document.getElementById('editor-screen');
   if (ls) ls.classList.add('hidden');
@@ -497,6 +752,7 @@ function editorTestPlay() {
     edToast('Add a ' + CLR_NAMES[first.ci] + ' bucket — ' + first.sand + ' grains have nowhere to go.');
     return;
   }
+  edPlayingFromEditor = true;
   var ed = document.getElementById('editor-screen');
   var ls = document.getElementById('level-screen');
   if (ed) ed.classList.add('hidden');
@@ -533,7 +789,7 @@ function editorExportJSON() {
     sandImage: Array.from(edLevel.sandImage || [])
   });
   ta.select();
-  edToast('Copied to box. Select + copy.');
+  edToast('Exported — select + copy.');
 }
 
 function editorImportJSON() {
@@ -556,10 +812,11 @@ function editorImportJSON() {
     while (edLevel.sandImage.length < SAND_W * SAND_H) edLevel.sandImage.push(-1);
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
-    edBuildSandGrid();
+    edRefreshSandGrid();
     edBuildGrid();
     edBuildToolbar();
     edRefreshLiveSections();
+    ta.style.display = 'none';
     edToast('Imported.');
   } catch (e) {
     edToast('Invalid JSON.');
