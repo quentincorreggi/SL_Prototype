@@ -163,10 +163,12 @@ function updateBucketActivation() {
 }
 
 // Spawn the next queued bucket from every tunnel whose target cell is
-// currently empty. Runs independently of activation — as soon as the
-// exit cell is free, the next item in the queue spawns. Loops because
-// chains of tunnels may cascade in one pass. Returns true if anything
-// spawned, so callers can re-run activation.
+// currently empty. A cell counts as empty when it is null OR holds a
+// used bucket (the faded placeholder left after a tap). Runs
+// independently of activation — as soon as the exit cell is free, the
+// next item in the queue spawns. Loops because chains of tunnels may
+// cascade in one pass. Returns true if anything spawned, so callers
+// can re-run activation.
 function updateTunnels() {
   var any = false;
   var spawned = true;
@@ -178,7 +180,8 @@ function updateTunnels() {
       if (!cell2.contents || cell2.contents.length === 0) continue;
       var target = tunnelTargetIndex(idx2, cell2.dir);
       if (target < 0) continue;
-      if (stock[target] != null) continue;
+      var existing = stock[target];
+      if (existing && !(existing.kind === 'bucket' && existing.used)) continue;
       var next = cell2.contents.shift();
       cell2.spawned = (cell2.spawned || 0) + 1;
       stock[target] = {
