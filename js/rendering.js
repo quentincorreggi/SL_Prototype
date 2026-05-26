@@ -42,6 +42,7 @@ function drawFrame() {
   drawBelt();
   drawGrid();
   drawJumpers();
+  if (typeof drawBombFlights === 'function') drawBombFlights();
   drawTrails();
   if (typeof drawParticles === 'function') drawParticles();
 }
@@ -273,6 +274,17 @@ function drawGrid() {
         } else {
           type.drawInactive(ctx, bx + ox, by, bw, bh, cell.ci, S, tick);
         }
+        continue;
+      }
+      if (cell.kind === 'bomb') {
+        if (cell.used) {
+          drawUsedBomb(ctx, bx + ox, by, bw, bh, cell.ci, S);
+        } else if (cell.active) {
+          drawBombActive(ctx, bx + ox, by, bw, bh, cell.ci, S, tick);
+        } else {
+          drawBombInactive(ctx, bx + ox, by, bw, bh, cell.ci, S, tick);
+        }
+        continue;
       }
     }
   }

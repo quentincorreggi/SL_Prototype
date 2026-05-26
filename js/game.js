@@ -16,6 +16,7 @@ function initGame(levelData) {
   jumpers = [];
   particles = [];
   attractionTrails = [];
+  bombFlights = [];
   rejectShake = { idx: -1, t: 0 };
   won = false;
   gameActive = true;
@@ -70,10 +71,12 @@ function computeLevelCapacities() {
     var c = sandGrid[i];
     if (c >= 0 && c < NUM_COLORS) sandPer[c]++;
   }
+  var bombGrains = (typeof bombPayloadGrains === 'function') ? bombPayloadGrains() : 0;
   for (var i = 0; i < stock.length; i++) {
     var cell = stock[i];
     if (!cell) continue;
     if (cell.kind === 'bucket') bktPer[cell.ci]++;
+    else if (cell.kind === 'bomb') sandPer[cell.ci] += bombGrains;
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bktPer[cell.contents[k].ci]++;
     }
@@ -106,6 +109,14 @@ function cloneCell(src) {
       active: false
     };
   }
+  if (src.kind === 'bomb') {
+    return {
+      kind: 'bomb',
+      ci: src.ci | 0,
+      used: false,
+      active: false
+    };
+  }
   return null;
 }
 
@@ -120,6 +131,7 @@ function isPassable(cell) {
   if (cell.kind === 'wall') return false;
   if (cell.kind === 'tunnel') return true;
   if (cell.kind === 'bucket') return cell.used;
+  if (cell.kind === 'bomb') return cell.used;
   return false;
 }
 
@@ -145,12 +157,14 @@ function updateBucketActivation() {
       if (isPassable(stock[ni])) { visited[ni] = 1; queue.push(ni); }
     }
   }
-  // Mark bucket cells: active iff (in row 0) or (any neighbor visited).
+  // Mark bucket/bomb cells: active iff (in row 0) or (any neighbor visited).
   for (var r = 0; r < GRID_H; r++) {
     for (var c = 0; c < GRID_W; c++) {
       var idx = r * GRID_W + c;
       var cell = stock[idx];
-      if (!cell || cell.kind !== 'bucket' || cell.used) continue;
+      if (!cell) continue;
+      if (cell.kind !== 'bucket' && cell.kind !== 'bomb') continue;
+      if (cell.used) continue;
       var active = false;
       if (r === 0) active = true;
       else if (visited[idx - GRID_W]) active = true;
@@ -221,7 +235,19 @@ function handleTap(sx, sy) {
   if (r < 0 || r >= GRID_H || c < 0 || c >= GRID_W) return;
   var idx = r * GRID_W + c;
   var cell = stock[idx];
-  if (!cell || cell.kind !== 'bucket' || cell.used || !cell.active) return;
+  if (!cell || cell.used || !cell.active) return;
+
+  if (cell.kind === 'bomb') {
+    // Bombs bypass the belt entirely — they arc straight to the
+    // sand image and detonate. No slot check needed.
+    cell.used = true;
+    fireBomb(cell, idx);
+    updateTunnels();
+    updateBucketActivation();
+    return;
+  }
+
+  if (cell.kind !== 'bucket') return;
 
   var slot = firstFreeBeltSlot();
   if (slot < 0) {
@@ -293,6 +319,7 @@ function update() {
   if (!gameActive) return;
   updateBelt();
   updateJumpers();
+  if (typeof updateBombFlights === 'function') updateBombFlights();
   updateRejectShake();
   // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
   if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
@@ -309,6 +336,10 @@ function update() {
 // If a color's sand is exhausted (and nothing in flight), any bucket of that
 // color sitting on the belt is marked done so it pops — otherwise a partially
 // filled "last" bucket would sit forever.
+//
+// Unfired bombs and in-flight bombs count as pending sand of their color —
+// otherwise a bucket waiting for its bomb to detonate would auto-pop before
+// the player has a chance to fire the bomb.
 function updateColorDepletion() {
   var hasSand = new Array(NUM_COLORS);
   for (var ci = 0; ci < NUM_COLORS; ci++) hasSand[ci] = false;
@@ -318,6 +349,19 @@ function updateColorDepletion() {
   }
   for (var t = 0; t < attractionTrails.length; t++) {
     hasSand[attractionTrails[t].ci] = true;
+  }
+  // Unfired bombs still in the grid
+  for (var i = 0; i < stock.length; i++) {
+    var cell = stock[i];
+    if (cell && cell.kind === 'bomb' && !cell.used) {
+      hasSand[cell.ci] = true;
+    }
+  }
+  // Bombs mid-flight (tap fired them but they haven't detonated yet)
+  if (typeof bombFlights !== 'undefined') {
+    for (var i = 0; i < bombFlights.length; i++) {
+      hasSand[bombFlights[i].ci] = true;
+    }
   }
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
@@ -332,6 +376,7 @@ function checkWin() {
   if (countSandRemaining() !== 0) return;
   if (jumpers.length !== 0) return;
   if (attractionTrails.length !== 0) return;
+  if (typeof bombFlights !== 'undefined' && bombFlights.length !== 0) return;
   for (var i = 0; i < BELT_SLOTS; i++) {
     if (beltSlots[i] != null) return;
   }
@@ -391,15 +436,25 @@ function quitGame() {
 function demoLevel() {
   var grid = new Array(GRID_W * GRID_H);
   for (var i = 0; i < grid.length; i++) grid[i] = null;
-  // A small set of buckets on rows 4-6, colors 0..2.
   function placeB(r, c, ci, type) {
     grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
   }
+  function placeBomb(r, c, ci) {
+    grid[r * GRID_W + c] = { kind: 'bomb', ci: ci };
+  }
+  // Row 3 showcase: two bombs flanked by their matching buckets, all
+  // active immediately (row 2 above is empty). Red and lime aren't in
+  // the painted image — the bombs introduce those colors.
+  placeB(3, 0, 8);       // red bucket
+  placeBomb(3, 2, 8);    // red bomb
+  placeBomb(3, 4, 5);    // lime bomb
+  placeB(3, 6, 5);       // lime bucket
+  // Rows 4–6: original demo layout for the painted sand colors.
   placeB(4, 1, 0); placeB(4, 3, 1); placeB(4, 5, 2);
   placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
   placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
 
-  // Sand image (32×32): simple horizontal stripes of colors 0..2
+  // Sand image (32×32): simple horizontal stripes of colors 0..2.
   var sand = new Array(IMG_W * IMG_H);
   for (var y = 0; y < IMG_H; y++) {
     var ci = (y < 11) ? 0 : (y < 22) ? 1 : 2;
@@ -407,7 +462,7 @@ function demoLevel() {
       sand[y * IMG_W + x] = ci;
     }
   }
-  return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+  return { name: 'Bomb Demo', desc: 'Tap a 💣 to drop a colored disc on the sand image', grid: grid, sandImage: sand };
 }
 
 // ============================================================

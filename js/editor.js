@@ -152,7 +152,8 @@ function edRedo() {
 function edComputeCounts() {
   var sand = new Array(NUM_COLORS);
   var bkt  = new Array(NUM_COLORS);
-  for (var i = 0; i < NUM_COLORS; i++) { sand[i] = 0; bkt[i] = 0; }
+  var bomb = new Array(NUM_COLORS);
+  for (var i = 0; i < NUM_COLORS; i++) { sand[i] = 0; bkt[i] = 0; bomb[i] = 0; }
   for (var i = 0; i < edLevel.sandImage.length; i++) {
     var c = edLevel.sandImage[i];
     if (c >= 0 && c < NUM_COLORS) sand[c]++;
@@ -161,18 +162,21 @@ function edComputeCounts() {
     var cell = edLevel.grid[i];
     if (!cell) continue;
     if (cell.kind === 'bucket') bkt[cell.ci]++;
+    else if (cell.kind === 'bomb') bomb[cell.ci]++;
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bkt[cell.contents[k].ci]++;
     }
   }
-  return { sand: sand, bkt: bkt };
+  return { sand: sand, bkt: bkt, bomb: bomb };
 }
 
 function edAvailableColors() {
   var stats = edComputeCounts();
   var out = [];
   for (var ci = 0; ci < NUM_COLORS; ci++) {
-    if (stats.sand[ci] > 0) out.push(ci);
+    // Buckets can be placed for any color that has sand OR a bomb of
+    // that color (since the bomb will produce sand on detonation).
+    if (stats.sand[ci] > 0 || stats.bomb[ci] > 0) out.push(ci);
   }
   return out;
 }
@@ -181,8 +185,13 @@ function edValidate() {
   var stats = edComputeCounts();
   var errors = [];
   for (var ci = 0; ci < NUM_COLORS; ci++) {
-    if (stats.sand[ci] > 0 && stats.bkt[ci] === 0) {
-      errors.push({ ci: ci, type: 'no-bucket', sand: stats.sand[ci] });
+    var hasSandSource = stats.sand[ci] > 0 || stats.bomb[ci] > 0;
+    if (hasSandSource && stats.bkt[ci] === 0) {
+      errors.push({
+        ci: ci, type: 'no-bucket',
+        sand: stats.sand[ci],
+        bomb: stats.bomb[ci]
+      });
     }
   }
   return { ok: errors.length === 0, errors: errors, stats: stats };
@@ -192,25 +201,37 @@ function edRenderCapacities() {
   var el = document.getElementById('ed-capacities');
   if (!el) return;
   var stats = edComputeCounts();
+  var bombGrains = (typeof bombPayloadGrains === 'function') ? bombPayloadGrains() : 0;
   el.innerHTML = '';
   var anyVisible = false;
   for (var ci = 0; ci < NUM_COLORS; ci++) {
-    if (stats.sand[ci] === 0 && stats.bkt[ci] === 0) continue;
+    if (stats.sand[ci] === 0 && stats.bkt[ci] === 0 && stats.bomb[ci] === 0) continue;
     anyVisible = true;
     var c = COLORS[ci];
-    var s = stats.sand[ci] * (SAND_SUBDIV * SAND_SUBDIV || 1), b = stats.bkt[ci];
+    var painted = stats.sand[ci] * (SAND_SUBDIV * SAND_SUBDIV || 1);
+    var fromBombs = stats.bomb[ci] * bombGrains;
+    var s = painted + fromBombs;
+    var b = stats.bkt[ci];
     var cap = (s > 0 && b > 0) ? Math.ceil(s / b) : 0;
     var chip = document.createElement('div');
     chip.className = 'ed-cap-chip';
+    var sandDescr = '' + s;
+    if (fromBombs > 0 && painted > 0) {
+      sandDescr = s + ' = ' + painted + ' painted + ' + fromBombs + ' from ' +
+        stats.bomb[ci] + ' bomb' + (stats.bomb[ci] === 1 ? '' : 's');
+    } else if (fromBombs > 0) {
+      sandDescr = fromBombs + ' from ' + stats.bomb[ci] + ' bomb' +
+        (stats.bomb[ci] === 1 ? '' : 's');
+    }
     var status = '';
     if (s > 0 && b === 0) {
       chip.classList.add('warn');
-      status = '⚠ no bucket for ' + s + ' grains';
+      status = '⚠ no bucket for ' + sandDescr;
     } else if (s === 0 && b > 0) {
       chip.classList.add('dim');
       status = b + '× · no sand';
     } else {
-      status = b + '× holds ' + cap + ' = ' + (b * cap) + ' (sand: ' + s + ')';
+      status = b + '× holds ' + cap + ' = ' + (b * cap) + ' (sand: ' + sandDescr + ')';
     }
     var dotStyle = 'background:linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
     chip.innerHTML =
@@ -221,7 +242,7 @@ function edRenderCapacities() {
   if (!anyVisible) {
     var hint = document.createElement('div');
     hint.style.cssText = 'font-size:12px;color:#9C8A70;text-align:center;padding:6px';
-    hint.textContent = 'Paint sand to see bucket capacities.';
+    hint.textContent = 'Paint sand or drop a bomb to see bucket capacities.';
     el.appendChild(hint);
   }
 }
@@ -570,6 +591,7 @@ function edBuildToolbar() {
   var types = [
     { id: 'default', label: 'Bucket' },
     { id: 'hidden',  label: 'Hidden' },
+    { id: 'bomb',    label: '💣 Bomb' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
     { id: 'erase',   label: 'Erase' }
@@ -593,7 +615,7 @@ function edBuildToolbar() {
     if (avail.length === 0) {
       var msg = document.createElement('div');
       msg.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic;text-align:center;padding:4px';
-      msg.textContent = 'Paint sand first to unlock bucket colors';
+      msg.textContent = 'Paint sand or drop a bomb first to unlock bucket colors';
       tb.appendChild(msg);
     } else {
       if (avail.indexOf(edColor) < 0) edColor = avail[0];
@@ -611,6 +633,28 @@ function edBuildToolbar() {
       });
       tb.appendChild(clrRow);
     }
+  } else if (edTool === 'bomb') {
+    // Bombs can be any color — they create their own sand.
+    var clrRow2 = document.createElement('div');
+    clrRow2.className = 'ed-color-row';
+    for (var ci = 0; ci < NUM_COLORS; ci++) {
+      (function (ci) {
+        var c = COLORS[ci];
+        var btn = document.createElement('button');
+        btn.className = 'ed-tool' + (edColor === ci ? ' active' : '');
+        btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+        btn.title = CLR_NAMES[ci] + ' bomb';
+        btn.textContent = '💣';
+        btn.style.color = 'rgba(255,255,255,0.95)';
+        btn.onclick = function () { edColor = ci; edBuildToolbar(); };
+        clrRow2.appendChild(btn);
+      })(ci);
+    }
+    tb.appendChild(clrRow2);
+    var hint = document.createElement('div');
+    hint.style.cssText = 'font-size:10px;color:#9C8A70;font-style:italic;text-align:center;padding:2px';
+    hint.textContent = 'Bombs release a circle of sand on detonation';
+    tb.appendChild(hint);
   }
 }
 
@@ -665,6 +709,14 @@ function edApplyCellStyle(el, cell) {
     el.style.background = st.background;
     el.style.borderColor = st.borderColor;
     el.innerHTML = type.editorCellHTML(cell.ci);
+    return;
+  }
+  if (cell.kind === 'bomb') {
+    var bc = COLORS[cell.ci];
+    el.style.background = 'radial-gradient(circle at 35% 35%,' + bc.light + ' 0%,' + bc.fill + ' 45%,#1A1410 100%)';
+    el.style.borderColor = '#1A1410';
+    el.innerHTML = '<span class="ed-cell-dot" style="font-size:15px">💣</span>';
+    return;
   }
 }
 
@@ -673,10 +725,12 @@ function edPaintCell(idx, eraseOverride) {
     edLevel.grid[idx] = null;
   } else if (edTool === 'default' || edTool === 'hidden') {
     if (edAvailableColors().length === 0) {
-      edToast('Paint sand first.');
+      edToast('Paint sand or drop a bomb first.');
       return;
     }
     edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
+  } else if (edTool === 'bomb') {
+    edLevel.grid[idx] = { kind: 'bomb', ci: edColor };
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
   } else if (edTool === 'tunnel') {
@@ -961,7 +1015,18 @@ function editorTestPlay() {
   var v = edValidate();
   if (!v.ok) {
     var first = v.errors[0];
-    edToast('Add a ' + CLR_NAMES[first.ci] + ' bucket — ' + first.sand + ' grains have nowhere to go.');
+    var name = CLR_NAMES[first.ci];
+    var msg;
+    if (first.sand > 0 && first.bomb > 0) {
+      msg = 'Add a ' + name + ' bucket — ' + first.sand + ' painted grains + ' +
+            first.bomb + ' bomb' + (first.bomb === 1 ? '' : 's') + ' need somewhere to go.';
+    } else if (first.bomb > 0) {
+      msg = 'Add a ' + name + ' bucket — ' + first.bomb + ' ' + name + ' bomb' +
+            (first.bomb === 1 ? '' : 's') + ' will release sand with nowhere to go.';
+    } else {
+      msg = 'Add a ' + name + ' bucket — ' + first.sand + ' grains have nowhere to go.';
+    }
+    edToast(msg);
     return;
   }
   edPlayingFromEditor = true;
@@ -987,6 +1052,7 @@ function cloneCellForLevel(c) {
       contents: (c.contents || []).map(function (b) { return { type: b.type, ci: b.ci }; })
     };
   }
+  if (c.kind === 'bomb') return { kind: 'bomb', ci: c.ci };
   return { kind: 'bucket', type: c.type, ci: c.ci };
 }
 

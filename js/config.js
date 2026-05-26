@@ -56,6 +56,7 @@ var SAND_FRAME_INTERVAL = 2;   // run the falling-sand CA every N frames
 var BUCKET_TRAIL_FRAMES = 18;  // duration of grain-to-bucket trail
 var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc
+var BOMB_FLIGHT_FRAMES = 32;   // duration of grid→image arc for bombs
 
 // === GRID ===
 var GRID_W = 7, GRID_H = 7;
