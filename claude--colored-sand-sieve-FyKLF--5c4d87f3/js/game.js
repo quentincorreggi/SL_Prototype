@@ -406,41 +406,34 @@ function quitGame() {
 // ============================================================
 
 function demoLevel() {
-  var grid = new Array(GRID_W * GRID_H);
-  for (var i = 0; i < grid.length; i++) grid[i] = null;
-  function placeB(r, c, ci, type) {
-    grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
+  // Showcase level (built in the editor): seven colour bands rain down; the
+  // yellow band feeds a yellow U-cup sieve. A wall maze gates the yellow key
+  // — clear the path and it auto-fires to crack the sieve open.
+  function B(ci) { return { kind: 'bucket', type: 'default', ci: ci }; }
+  var WALL = { kind: 'wall' };
+  var grid = [
+    B(0), B(0), B(0), B(0), B(9), B(9), B(9), B(1), B(1), B(1),
+    B(4), B(4), B(4), B(4), B(5), B(5), B(5), B(5), B(8), B(8),
+    B(8), WALL, WALL, { kind: 'key', ci: 9 }, B(10), B(10), WALL, WALL, null, WALL,
+    WALL, WALL, WALL, WALL, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null, null
+  ];
+
+  // Horizontal colour bands (top → bottom), each a run of full rows.
+  var bands = [[10, 5], [4, 5], [0, 4], [5, 4], [9, 4], [1, 5], [8, 4]];
+  var sand = [];
+  for (var b = 0; b < bands.length; b++) {
+    var n = bands[b][1] * IMG_W;
+    for (var k = 0; k < n; k++) sand.push(bands[b][0]);
   }
-  function placeKey(r, c, ci) { grid[r * GRID_W + c] = { kind: 'key', ci: ci }; }
-  function placeWall(r, c) { grid[r * GRID_W + c] = { kind: 'wall' }; }
-
-  // Row 0: tap the cyan bucket (c3) to free the key directly below it.
-  placeB(0, 1, 1); placeB(0, 3, 0); placeB(0, 5, 1);
-  // Row 1: a cyan KEY boxed in by walls — its only way up is through the
-  // cyan bucket above, so the player must clear that first.
-  placeWall(1, 2); placeKey(1, 3, 0); placeWall(1, 4);
-  // Row 2: more buckets, gated behind the key (c3) or open columns.
-  placeB(2, 1, 0); placeB(2, 3, 1); placeB(2, 5, 0);
-
-  // Sand image (32×32): cyan on the left, amber on the right.
-  var sand = new Array(IMG_W * IMG_H);
-  for (var i = 0; i < sand.length; i++) sand[i] = -1;
-  for (var y = 0; y < 11; y++) {
-    for (var x = 0; x < IMG_W; x++) {
-      sand[y * IMG_W + x] = (x < 16) ? 0 : 1;
-    }
-  }
-
-  // A cyan U-cup sieve under the cyan band: it traps the cyan that rains
-  // into it (amber on the right falls past) until the key unlocks it.
-  var sieveList = [{ ci: 0, px: 4, py: 14, pw: 11, ph: 8 }];
+  while (sand.length < IMG_W * IMG_H) sand.push(-1); // empty bottom row
 
   return {
-    name: 'Sieve Demo',
-    desc: 'Free the key to unlock the cyan sieve',
+    name: 'Sieve Showcase',
+    desc: 'Free the yellow key to crack the sieve open',
     grid: grid,
     sandImage: sand,
-    sieves: sieveList
+    sieves: [{ ci: 9, px: 15, py: 19, pw: 13, ph: 5 }]
   };
 }
 
