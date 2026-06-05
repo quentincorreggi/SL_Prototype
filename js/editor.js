@@ -20,7 +20,8 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(IMG_W * IMG_H)
+  sandImage: new Array(IMG_W * IMG_H),
+  sieves: []   // [{ ci, px, py, pw, ph }] — U-cups in the sand image
 };
 
 // --- Bucket-grid state ---
@@ -53,6 +54,7 @@ var ED_HISTORY_LIMIT = 80;
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.sieves = [];
   edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
@@ -74,8 +76,15 @@ function edSnapshotState() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    sieves: edCloneSieves(edLevel.sieves)
   };
+}
+
+function edCloneSieves(list) {
+  return (list || []).map(function (s) {
+    return { ci: s.ci, px: s.px, py: s.py, pw: s.pw, ph: s.ph };
+  });
 }
 
 function edPushHistory() {
@@ -95,6 +104,7 @@ function edRestoreState(s) {
   edLevel.desc = s.desc;
   edLevel.grid = s.grid.map(cloneCellForLevel);
   edLevel.sandImage = s.sandImage.slice();
+  edLevel.sieves = edCloneSieves(s.sieves);
   // Cancel any in-progress drag so a subsequent move event won't restore
   // the pre-drag snapshot over the just-restored state.
   edDragging = false;
@@ -185,6 +195,19 @@ function edValidate() {
       errors.push({ ci: ci, type: 'no-bucket', sand: stats.sand[ci] });
     }
   }
+  // Every sieve colour needs at least one matching key, or its trapped
+  // sand can never be released and the level is unwinnable.
+  var keyColors = {};
+  for (var i = 0; i < edLevel.grid.length; i++) {
+    var cell = edLevel.grid[i];
+    if (cell && cell.kind === 'key') keyColors[cell.ci] = 1;
+  }
+  var sieveClrs = edSieveColors();
+  for (var k = 0; k < sieveClrs.length; k++) {
+    if (!keyColors[sieveClrs[k]]) {
+      errors.push({ ci: sieveClrs[k], type: 'no-key' });
+    }
+  }
   return { ok: errors.length === 0, errors: errors, stats: stats };
 }
 
@@ -256,7 +279,8 @@ var SAND_TOOLS = [
   { id: 'fill',    icon: '▣', label: 'Fill' },
   { id: 'rect',    icon: '◻', label: 'Rect' },
   { id: 'ellipse', icon: '○', label: 'Oval' },
-  { id: 'line',    icon: '╲', label: 'Line' }
+  { id: 'line',    icon: '╲', label: 'Line' },
+  { id: 'sieve',   icon: '⊔', label: 'Sieve' }
 ];
 var BRUSH_SIZES = [1, 2, 3, 4];
 
@@ -338,6 +362,7 @@ function edBuildSandGrid() {
     g.appendChild(px);
     edSandCells.push(px);
   }
+  edRenderSieves();
 }
 
 function edRefreshSandGrid() {
@@ -348,6 +373,7 @@ function edRefreshSandGrid() {
   for (var i = 0; i < edSandCells.length; i++) {
     edApplySandCell(edSandCells[i], edLevel.sandImage[i]);
   }
+  edRenderSieves();
 }
 
 function edApplySandCell(el, ci) {
@@ -355,6 +381,64 @@ function edApplySandCell(el, ci) {
     el.style.background = '#F4ECDB';
   } else {
     el.style.background = COLORS[ci].fill;
+  }
+  // Clear any sieve frame styling; edRenderSieves re-applies it.
+  el.style.boxShadow = '';
+  el.style.zIndex = '';
+  el.textContent = '';
+}
+
+// Cells (image-pixel coords) that make up a sieve's U: two side walls + floor.
+function edSieveCells(sv) {
+  var out = [];
+  var x0 = sv.px, x1 = sv.px + sv.pw - 1;
+  var y0 = sv.py, y1 = sv.py + sv.ph - 1;
+  for (var y = y0; y <= y1; y++) {
+    out.push({ x: x0, y: y });          // left wall
+    out.push({ x: x1, y: y });          // right wall
+  }
+  for (var x = x0 + 1; x < x1; x++) {
+    out.push({ x: x, y: y1 });          // floor
+  }
+  return out;
+}
+
+// Paint committed sieves (plus an optional live drag preview) onto the
+// editor's sand grid using inset box-shadows so painted sand stays visible.
+function edRenderSieves(preview) {
+  var list = edLevel.sieves || [];
+  for (var i = 0; i < list.length; i++) {
+    edPaintSieveFrame(list[i], false);
+  }
+  if (preview) edPaintSieveFrame(preview, true);
+}
+
+function edPaintSieveFrame(sv, isPreview) {
+  var c = COLORS[sv.ci];
+  var cells = edSieveCells(sv);
+  for (var i = 0; i < cells.length; i++) {
+    var x = cells[i].x, y = cells[i].y;
+    if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) continue;
+    var el = edSandCells[y * IMG_W + x];
+    if (!el) continue;
+    el.style.boxShadow = isPreview
+      ? 'inset 0 0 0 1px rgba(255,255,255,0.9)'
+      : 'inset 0 0 0 1px ' + c.dark;
+    el.style.background = c.fill;
+    el.style.zIndex = '1';
+  }
+  // Lock glyph at the cup's top-centre.
+  var lx = sv.px + Math.floor(sv.pw / 2);
+  var ly = sv.py;
+  if (lx >= 0 && lx < IMG_W && ly >= 0 && ly < IMG_H) {
+    var lel = edSandCells[ly * IMG_W + lx];
+    if (lel) {
+      lel.style.display = 'flex';
+      lel.style.alignItems = 'center';
+      lel.style.justifyContent = 'center';
+      lel.style.fontSize = '8px';
+      lel.textContent = isPreview ? '' : '🔒';
+    }
   }
 }
 
@@ -391,8 +475,27 @@ function onSandPointerDown(e) {
   if (g.setPointerCapture) {
     try { g.setPointerCapture(e.pointerId); } catch (_) { }
   }
-  // Right-click forces eraser regardless of current tool
   var rightClick = (e.button === 2 || e.buttons === 2);
+
+  // Sieve tool: left-drag draws a U-cup rectangle; right-click removes one.
+  if (edSandMode === 'sieve') {
+    if (rightClick) {
+      if (edRemoveSieveAt(pt.x, pt.y)) {
+        edRefreshSandGrid(); edOnSandChanged(); edPushHistory();
+      }
+      edDragging = false;
+      return;
+    }
+    edDragging = true;
+    edDragMode = 'sieve';
+    edDragStart = pt;
+    edDragLast = pt;
+    edRefreshSandGrid();
+    edRenderSieves(edSieveRectFrom(pt, pt));
+    return;
+  }
+
+  // Right-click forces eraser regardless of current tool
   var mode = rightClick ? 'eraser' : edSandMode;
   var color = rightClick ? -1 : edSandTool;
 
@@ -433,6 +536,11 @@ function onSandPointerMove(e) {
   var pt = pointerToSandCell(e);
   if (!pt) return;
 
+  if (edDragMode === 'sieve') {
+    edRefreshSandGrid();
+    edRenderSieves(edSieveRectFrom(edDragStart, pt));
+    return;
+  }
   if (edDragMode === 'brush' || edDragMode === 'eraser') {
     var color = edDragMode === 'eraser' ? -1 : edSandTool;
     paintLine(edDragLast.x, edDragLast.y, pt.x, pt.y, color, edBrushSize);
@@ -458,13 +566,55 @@ function onSandPointerMove(e) {
 
 function onSandPointerUp(e) {
   if (!edDragging) return;
+  var wasSieve = edDragMode === 'sieve';
+  var sieveRect = wasSieve ? edSieveRectFrom(edDragStart, edDragLastPt(e)) : null;
   edDragging = false;
   edDragMode = null;
   edDragStart = null;
   edDragLast = null;
   edSnapshot = null;
+
+  if (wasSieve) {
+    if (sieveRect && sieveRect.pw >= 3 && sieveRect.ph >= 3) {
+      edLevel.sieves.push(sieveRect);
+      edToast(CLR_NAMES[sieveRect.ci] + ' sieve placed');
+    } else {
+      edToast('Sieve too small — drag at least 3×3.');
+    }
+    edRefreshSandGrid();
+    edOnSandChanged();
+    edPushHistory();
+    return;
+  }
+
   edOnSandChanged();
   edPushHistory();
+}
+
+// Build a normalized sieve rect {ci,px,py,pw,ph} from two drag points.
+function edSieveRectFrom(a, b) {
+  var x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+  var y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+  return { ci: edSandTool, px: x0, py: y0, pw: x1 - x0 + 1, ph: y1 - y0 + 1 };
+}
+
+// Pointer→cell on pointerup may land just outside; fall back to the drag start.
+function edDragLastPt(e) {
+  var pt = pointerToSandCell(e);
+  return pt || edDragStart;
+}
+
+// Remove the first sieve whose footprint contains (x, y). Returns true if removed.
+function edRemoveSieveAt(x, y) {
+  for (var i = edLevel.sieves.length - 1; i >= 0; i--) {
+    var s = edLevel.sieves[i];
+    if (x >= s.px && x < s.px + s.pw && y >= s.py && y < s.py + s.ph) {
+      edLevel.sieves.splice(i, 1);
+      edToast('Sieve removed');
+      return true;
+    }
+  }
+  return false;
 }
 
 // ============================================================
@@ -572,6 +722,7 @@ function edBuildToolbar() {
     { id: 'hidden',  label: 'Hidden' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
+    { id: 'key',     label: 'Key' },
     { id: 'erase',   label: 'Erase' }
   ];
   types.forEach(function (t) {
@@ -612,6 +763,42 @@ function edBuildToolbar() {
       tb.appendChild(clrRow);
     }
   }
+
+  if (edTool === 'key') {
+    var sieveClrs = edSieveColors();
+    if (sieveClrs.length === 0) {
+      var kmsg = document.createElement('div');
+      kmsg.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic;text-align:center;padding:4px';
+      kmsg.textContent = 'Place a sieve first — keys unlock matching colors';
+      tb.appendChild(kmsg);
+    } else {
+      if (sieveClrs.indexOf(edColor) < 0) edColor = sieveClrs[0];
+      var kRow = document.createElement('div');
+      kRow.className = 'ed-color-row';
+      sieveClrs.forEach(function (ci) {
+        var c = COLORS[ci];
+        var btn = document.createElement('button');
+        btn.className = 'ed-tool' + (edColor === ci ? ' active' : '');
+        btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+        btn.title = CLR_NAMES[ci] + ' key';
+        btn.textContent = '🔑';
+        btn.style.fontSize = '13px';
+        btn.onclick = function () { edColor = ci; edBuildToolbar(); };
+        kRow.appendChild(btn);
+      });
+      tb.appendChild(kRow);
+    }
+  }
+}
+
+// Distinct colors that have at least one sieve placed.
+function edSieveColors() {
+  var seen = {}, out = [];
+  (edLevel.sieves || []).forEach(function (s) {
+    if (!seen[s.ci]) { seen[s.ci] = 1; out.push(s.ci); }
+  });
+  out.sort(function (a, b) { return a - b; });
+  return out;
 }
 
 // ============================================================
@@ -659,6 +846,13 @@ function edApplyCellStyle(el, cell) {
     }
     return;
   }
+  if (cell.kind === 'key') {
+    var kc = COLORS[cell.ci];
+    el.style.background = 'linear-gradient(135deg,' + kc.light + ',' + kc.dark + ')';
+    el.style.borderColor = kc.dark;
+    el.innerHTML = '<span class="ed-cell-dot">🔑</span>';
+    return;
+  }
   if (cell.kind === 'bucket') {
     var type = getBucketType(cell.type);
     var st = type.editorCellStyle(cell.ci);
@@ -679,6 +873,12 @@ function edPaintCell(idx, eraseOverride) {
     edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
+  } else if (edTool === 'key') {
+    if (edSieveColors().length === 0) {
+      edToast('Place a sieve first.');
+      return;
+    }
+    edLevel.grid[idx] = { kind: 'key', ci: edColor };
   } else if (edTool === 'tunnel') {
     var newTunnel = false;
     if (!edLevel.grid[idx] || edLevel.grid[idx].kind !== 'tunnel') {
@@ -794,6 +994,7 @@ function edHideTunnelPanel() {
 function edClearAll() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.sieves = [];
   edHideTunnelPanel();
   edBuildGrid();
   edRefreshSandGrid();
@@ -961,7 +1162,11 @@ function editorTestPlay() {
   var v = edValidate();
   if (!v.ok) {
     var first = v.errors[0];
-    edToast('Add a ' + CLR_NAMES[first.ci] + ' bucket — ' + first.sand + ' grains have nowhere to go.');
+    if (first.type === 'no-key') {
+      edToast('Add a ' + CLR_NAMES[first.ci] + ' key — the ' + CLR_NAMES[first.ci] + ' sieve can never be opened.');
+    } else {
+      edToast('Add a ' + CLR_NAMES[first.ci] + ' bucket — ' + first.sand + ' grains have nowhere to go.');
+    }
     return;
   }
   edPlayingFromEditor = true;
@@ -973,13 +1178,15 @@ function editorTestPlay() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    sieves: edCloneSieves(edLevel.sieves)
   });
 }
 
 function cloneCellForLevel(c) {
   if (!c) return null;
   if (c.kind === 'wall') return { kind: 'wall' };
+  if (c.kind === 'key') return { kind: 'key', ci: c.ci };
   if (c.kind === 'tunnel') {
     return {
       kind: 'tunnel',
@@ -998,7 +1205,8 @@ function editorExportJSON() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid,
-    sandImage: Array.from(edLevel.sandImage || [])
+    sandImage: Array.from(edLevel.sandImage || []),
+    sieves: edCloneSieves(edLevel.sieves)
   });
   ta.select();
   edToast('Exported — select + copy.');
@@ -1022,6 +1230,7 @@ function editorImportJSON() {
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
     edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
     while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
+    edLevel.sieves = edCloneSieves(data.sieves);
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();

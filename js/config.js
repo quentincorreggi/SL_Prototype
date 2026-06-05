@@ -29,6 +29,23 @@ var particles = [];            // visual effects
 var attractionTrails = [];     // animated grain → bucket trails
 var belowReveals = [];         // hidden-bucket reveal animations (on belt landing)
 
+// === SIEVE MECHANIC ===
+// A colored U-cup placed in the sand image. While locked, its own color
+// piles up inside the cup (held by walls + a colored mesh floor) and every
+// other color falls straight through. A matching-color Key in the grid
+// auto-launches when its path opens, flies up, and unlocks the sieve —
+// the walls/floor vanish and the trapped sand spills out.
+var sieves = [];               // active sieve instances (built at initGame)
+var keyFlyers = [];            // keys animating grid → sieve
+// Per-sand-cell lookup tables for locked sieves, sized SAND_W*SAND_H at init:
+//   sieveSolidGrid — encodes wall/floor solidity for the falling-sand CA
+//   sieveTrapGrid  — 1 if the cell sits inside a locked sieve (un-pullable)
+var sieveSolidGrid = null;     // Int16Array: 0=none, else ((idx+1)<<2)|kind (1=wall,2=floor)
+var sieveTrapGrid = null;      // Uint8Array: 1 = inside a locked sieve footprint
+var SIEVE_WALL = 1, SIEVE_FLOOR = 2;
+var SIEVE_UNLOCK_FRAMES = 30;  // flash/dissolve animation after a sieve unlocks
+var KEY_FLY_FRAMES = 42;       // duration of a key's grid → sieve arc
+
 // === SAND IMAGE ===
 // IMG_W/IMG_H — fixed 32×32 image (editor paints at this resolution).
 // SAND_W/SAND_H — runtime sand grid; subdivided so each image pixel

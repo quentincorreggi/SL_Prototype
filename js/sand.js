@@ -38,9 +38,9 @@ function processSandCell(x, y, cx) {
   if (sandGrid[idx] < 0) return;
   var ci = sandGrid[idx];
 
-  // 1. Straight down
+  // 1. Straight down — open iff empty AND not blocked by a sieve wall/floor.
   var belowIdx = sandIdx(x, y + 1);
-  if (sandGrid[belowIdx] < 0) {
+  if (sandGrid[belowIdx] < 0 && !sieveBlocks(belowIdx, ci)) {
     sandGrid[belowIdx] = ci;
     sandGrid[idx] = -1;
     return;
@@ -60,16 +60,22 @@ function processSandCell(x, y, cx) {
   }
 
   var nx = x + slipFirst;
-  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
-    sandGrid[sandIdx(nx, y + 1)] = ci;
-    sandGrid[idx] = -1;
-    return;
+  if (nx >= 0 && nx < SAND_W) {
+    var ni = sandIdx(nx, y + 1);
+    if (sandGrid[ni] < 0 && !sieveBlocks(ni, ci)) {
+      sandGrid[ni] = ci;
+      sandGrid[idx] = -1;
+      return;
+    }
   }
   nx = x + slipSecond;
-  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
-    sandGrid[sandIdx(nx, y + 1)] = ci;
-    sandGrid[idx] = -1;
-    return;
+  if (nx >= 0 && nx < SAND_W) {
+    var ni2 = sandIdx(nx, y + 1);
+    if (sandGrid[ni2] < 0 && !sieveBlocks(ni2, ci)) {
+      sandGrid[ni2] = ci;
+      sandGrid[idx] = -1;
+      return;
+    }
   }
 }
 
@@ -117,6 +123,7 @@ function findGrainsInRadius(cx, cy, ci, maxR, maxN) {
   for (var y = minY; y <= maxY; y++) {
     for (var x = minX; x <= maxX; x++) {
       if (sandGrid[sandIdx(x, y)] !== ci) continue;
+      if (sandCellTrapped(x, y)) continue; // locked in a sieve — unreachable
       var dx = x - cx, dy = y - cy;
       var d2 = dx * dx + dy * dy;
       if (d2 <= r2) out.push({ x: x, y: y, d2: d2 });

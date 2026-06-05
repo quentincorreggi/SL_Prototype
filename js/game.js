@@ -55,6 +55,9 @@ function initGame(levelData) {
     }
   }
 
+  // Build sieves (U-cups in the sand image) from level data.
+  initSieves(lvl.sieves);
+
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
   updateTunnels();
@@ -97,6 +100,15 @@ function cloneCell(src) {
     }
     return copy;
   }
+  if (src.kind === 'key') {
+    return {
+      kind: 'key',
+      ci: src.ci | 0,
+      used: false,
+      active: false,
+      fired: false
+    };
+  }
   if (src.kind === 'bucket') {
     return {
       kind: 'bucket',
@@ -120,6 +132,7 @@ function isPassable(cell) {
   if (cell.kind === 'wall') return false;
   if (cell.kind === 'tunnel') return true;
   if (cell.kind === 'bucket') return cell.used;
+  if (cell.kind === 'key') return cell.used;
   return false;
 }
 
@@ -145,12 +158,12 @@ function updateBucketActivation() {
       if (isPassable(stock[ni])) { visited[ni] = 1; queue.push(ni); }
     }
   }
-  // Mark bucket cells: active iff (in row 0) or (any neighbor visited).
+  // Mark bucket/key cells: active iff (in row 0) or (any neighbor visited).
   for (var r = 0; r < GRID_H; r++) {
     for (var c = 0; c < GRID_W; c++) {
       var idx = r * GRID_W + c;
       var cell = stock[idx];
-      if (!cell || cell.kind !== 'bucket' || cell.used) continue;
+      if (!cell || (cell.kind !== 'bucket' && cell.kind !== 'key') || cell.used) continue;
       var active = false;
       if (r === 0) active = true;
       else if (visited[idx - GRID_W]) active = true;
@@ -299,10 +312,14 @@ function update() {
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
+  updateSieves();
+  updateKeyFlyers();
   if (typeof tickParticles === 'function') tickParticles();
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
   if (updateTunnels()) updateBucketActivation();
+  // Keys auto-launch the instant their path to the belt opens.
+  updateKeys();
   checkWin();
 }
 
@@ -391,23 +408,40 @@ function quitGame() {
 function demoLevel() {
   var grid = new Array(GRID_W * GRID_H);
   for (var i = 0; i < grid.length; i++) grid[i] = null;
-  // A small set of buckets on rows 4-6, colors 0..2.
   function placeB(r, c, ci, type) {
     grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
   }
-  placeB(4, 1, 0); placeB(4, 3, 1); placeB(4, 5, 2);
-  placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
-  placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
+  function placeKey(r, c, ci) { grid[r * GRID_W + c] = { kind: 'key', ci: ci }; }
+  function placeWall(r, c) { grid[r * GRID_W + c] = { kind: 'wall' }; }
 
-  // Sand image (32×32): simple horizontal stripes of colors 0..2
+  // Row 0: tap the cyan bucket (c3) to free the key directly below it.
+  placeB(0, 1, 1); placeB(0, 3, 0); placeB(0, 5, 1);
+  // Row 1: a cyan KEY boxed in by walls — its only way up is through the
+  // cyan bucket above, so the player must clear that first.
+  placeWall(1, 2); placeKey(1, 3, 0); placeWall(1, 4);
+  // Row 2: more buckets, gated behind the key (c3) or open columns.
+  placeB(2, 1, 0); placeB(2, 3, 1); placeB(2, 5, 0);
+
+  // Sand image (32×32): cyan on the left, amber on the right.
   var sand = new Array(IMG_W * IMG_H);
-  for (var y = 0; y < IMG_H; y++) {
-    var ci = (y < 11) ? 0 : (y < 22) ? 1 : 2;
+  for (var i = 0; i < sand.length; i++) sand[i] = -1;
+  for (var y = 0; y < 11; y++) {
     for (var x = 0; x < IMG_W; x++) {
-      sand[y * IMG_W + x] = ci;
+      sand[y * IMG_W + x] = (x < 16) ? 0 : 1;
     }
   }
-  return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+
+  // A cyan U-cup sieve under the cyan band: it traps the cyan that rains
+  // into it (amber on the right falls past) until the key unlocks it.
+  var sieveList = [{ ci: 0, px: 4, py: 14, pw: 11, ph: 8 }];
+
+  return {
+    name: 'Sieve Demo',
+    desc: 'Free the key to unlock the cyan sieve',
+    grid: grid,
+    sandImage: sand,
+    sieves: sieveList
+  };
 }
 
 // ============================================================

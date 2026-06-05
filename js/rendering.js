@@ -39,9 +39,11 @@ function drawFrame() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
   drawSandImage();
+  if (typeof drawSieves === 'function') drawSieves();
   drawBelt();
   drawGrid();
   drawJumpers();
+  if (typeof drawKeyFlyers === 'function') drawKeyFlyers();
   drawTrails();
   if (typeof drawParticles === 'function') drawParticles();
 }
@@ -260,6 +262,10 @@ function drawGrid() {
       }
       if (cell.kind === 'tunnel') {
         drawTunnel(ctx, bx + ox, by, bw, bh, cell, S, tick);
+        continue;
+      }
+      if (cell.kind === 'key') {
+        drawKey(ctx, bx + ox, by, bw, bh, cell.ci, S, tick, cell.active, cell.used);
         continue;
       }
       if (cell.kind === 'bucket') {

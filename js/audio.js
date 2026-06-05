@@ -27,6 +27,11 @@ var sfx = {
   drop:  function () { tone(400, 0.08, 'sine', 0.04, 200); },
   pull:  function () { tone(600, 0.05, 'triangle', 0.04, 900); },
   reject:function () { tone(180, 0.10, 'square', 0.06, 110); },
+  keyfly:function () { tone(520, 0.30, 'sine', 0.05, 1100); },
+  unlock:function () {
+    tone(660, 0.14, 'triangle', 0.10, 990);
+    setTimeout(function () { tone(990, 0.22, 'triangle', 0.10, 1480); }, 90);
+  },
   win:   function () {
     [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) {
       setTimeout(function () { tone(f, 0.25, 'sine', 0.12); }, i * 100);
