@@ -168,8 +168,8 @@ function updateBucketActivation() {
       var idx = r * GRID_W + c;
       var cell = stock[idx];
       if (!cell || cell.kind !== 'bucket' || cell.used) continue;
-      // A locked grid bucket is never tappable until its counter hits 0.
-      if (cell.type === 'locked' && cell.lock > 0) { cell.active = false; continue; }
+      // Locked buckets compute their path-to-belt active state exactly like
+      // any other bucket; the lock is a separate gate enforced at tap time.
       var active = false;
       if (r === 0) active = true;
       else if (visited[idx - GRID_W]) active = true;
@@ -240,7 +240,15 @@ function handleTap(sx, sy) {
   if (r < 0 || r >= GRID_H || c < 0 || c >= GRID_W) return;
   var idx = r * GRID_W + c;
   var cell = stock[idx];
-  if (!cell || cell.kind !== 'bucket' || cell.used || !cell.active) return;
+  if (!cell || cell.kind !== 'bucket' || cell.used) return;
+  // Locked bucket: obeys the normal path/slot rules, but the counter must
+  // reach 0 first. Reject with the same shake/cue as a belt-full tap.
+  if (cell.type === 'locked' && cell.lock > 0) {
+    rejectShake = { idx: idx, t: 14 };
+    if (typeof sfx !== 'undefined') sfx.reject();
+    return;
+  }
+  if (!cell.active) return;
 
   var slot = firstFreeBeltSlot();
   if (slot < 0) {
