@@ -169,6 +169,32 @@
 
   #ed-tunnel-panel{display:none;background:rgba(61,53,72,0.10);border-radius:12px;padding:10px 12px;
     border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
+
+  /* Belt Items (conveyor blocks) */
+  #ed-belt-items{flex-shrink:0}
+  .ed-belt-section-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;
+    letter-spacing:1.2px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .ed-belt-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;
+    background:rgba(255,255,255,0.6);border:1px solid rgba(160,140,120,0.3);margin-bottom:4px}
+  .ed-belt-item-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.2)}
+  .ed-belt-item-info{flex:1;font-size:12px;font-weight:600;color:#5A4A38}
+  .ed-belt-item-threshold{width:48px;padding:3px 6px;border:1.5px solid rgba(160,140,120,0.3);
+    border-radius:6px;font-family:'Fredoka',sans-serif;font-size:12px;color:#5A4A38;
+    text-align:center;background:rgba(255,255,255,0.85);outline:none}
+  .ed-belt-item-threshold:focus{border-color:rgba(123,82,160,0.5)}
+  .ed-belt-item-rm{width:22px;height:22px;border:none;border-radius:6px;background:rgba(220,80,80,0.2);
+    color:#A53030;font-size:13px;cursor:pointer;font-family:'Fredoka',sans-serif;display:flex;
+    align-items:center;justify-content:center;flex-shrink:0;transition:transform 0.12s}
+  .ed-belt-item-rm:hover{background:rgba(220,80,80,0.35);transform:scale(1.1)}
+  .ed-belt-add{margin-top:6px}
+  .ed-belt-add-label{font-size:11px;color:#5A4A38;margin-bottom:4px;font-weight:600}
+  .ed-belt-add-colors{display:flex;gap:3px;flex-wrap:wrap}
+  .ed-belt-add-clr{width:26px;height:26px;border:2px solid rgba(255,255,255,0.3);border-radius:6px;
+    cursor:pointer;transition:transform 0.12s;display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:white;font-weight:700;font-family:'Fredoka',sans-serif;
+    text-shadow:0 1px 2px rgba(0,0,0,0.2)}
+  .ed-belt-add-clr:hover{transform:scale(1.15)}
+  .ed-belt-warn{font-size:11px;color:#A53030;font-style:italic;margin-top:4px}
   .ed-section-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
     margin-bottom:8px;display:flex;align-items:center;gap:6px}
   .ed-section-title .icon{font-size:15px}
@@ -308,6 +334,7 @@
         <div id="ed-capacities"></div>
         <div id="ed-toolbar"></div>
         <div class="ed-grid-area"><div id="ed-grid"></div></div>
+        <div id="ed-belt-items"></div>
         <div class="ed-quick">
           <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
           <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
@@ -351,6 +378,7 @@
 <script src="js/registry.js"></script>
 <script src="js/bucket_default.js"></script>
 <script src="js/bucket_hidden.js"></script>
+<script src="js/bucket_conveyor.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/particles.js"></script>

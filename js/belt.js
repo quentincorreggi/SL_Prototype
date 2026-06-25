@@ -49,10 +49,12 @@ function updateBelt() {
         }
       }
       if (b.popT >= BUCKET_POP_FRAMES) {
+        if (typeof onBucketCleared === 'function') onBucketCleared(b);
         beltSlots[s] = null;
       }
     }
     if (b && b.revealT != null && b.revealT < 12) b.revealT++;
+    if (b && b.unlockT != null && b.unlockT < 30) b.unlockT++;
   }
 }
 
