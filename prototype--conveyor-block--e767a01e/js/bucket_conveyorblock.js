@@ -104,6 +104,8 @@ function onBucketCleared(popped) {
       if (b.unlockLeft <= 0) unlockConveyorBlock(b, s);
     }
   }
+  // The grid Locked Bucket variant ticks down on the same clear event.
+  if (typeof onBucketClearedGrid === 'function') onBucketClearedGrid(popped);
 }
 
 function unlockConveyorBlock(b, slot) {
@@ -126,24 +128,39 @@ function unlockConveyorBlock(b, slot) {
 // contents, no jumpers, no other collecting belt buckets) a locked block
 // could never unlock — force it open so the level stays winnable.
 function relieveConveyorSoftlock() {
-  var lockedSlots = [];
   var clearable = jumpers.length;
+  var lockedGrid = [];
   for (var i = 0; i < stock.length; i++) {
     var c = stock[i];
     if (!c) continue;
-    if (c.kind === 'bucket' && !c.used) clearable++;
-    else if (c.kind === 'tunnel' && c.contents) clearable += c.contents.length;
+    if (c.kind === 'bucket' && !c.used) {
+      // A locked grid bucket can't be cleared until it opens.
+      if (c.type === 'locked' && c.lock > 0) lockedGrid.push(i);
+      else clearable++;
+    } else if (c.kind === 'tunnel' && c.contents) {
+      clearable += c.contents.length;
+    }
   }
+  var lockedBelt = [];
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
     if (!b || b.reserved) continue;
-    if (b.locked) lockedSlots.push(s);
+    if (b.locked) lockedBelt.push(s);
     else if (!b.done) clearable++;
   }
-  if (lockedSlots.length === 0 || clearable > 0) return;
-  for (var k = 0; k < lockedSlots.length; k++) {
-    unlockConveyorBlock(beltSlots[lockedSlots[k]], lockedSlots[k]);
+  if (clearable > 0) return;
+  if (lockedBelt.length === 0 && lockedGrid.length === 0) return;
+  // Nothing else can ever be cleared, so locked items would never tick down —
+  // force them open to keep the level winnable.
+  for (var k = 0; k < lockedBelt.length; k++) {
+    unlockConveyorBlock(beltSlots[lockedBelt[k]], lockedBelt[k]);
   }
+  var anyGrid = false;
+  for (var g = 0; g < lockedGrid.length; g++) {
+    unlockLockedBucket(stock[lockedGrid[g]], lockedGrid[g]);
+    anyGrid = true;
+  }
+  if (anyGrid && typeof updateBucketActivation === 'function') updateBucketActivation();
 }
 
 // ------------------------------------------------------------

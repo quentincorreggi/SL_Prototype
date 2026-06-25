@@ -274,6 +274,11 @@ function drawGrid() {
           drawUsedBucket(bx + ox, by, bw, bh, cell.ci);
           continue;
         }
+        // Locked Bucket draws its own counter/casing (needs the cell).
+        if (cell.type === 'locked') {
+          drawLockedBucket(ctx, bx + ox, by, bw, bh, cell, S, tick);
+          continue;
+        }
         var type = getBucketType(cell.type);
         if (cell.active) {
           type.drawActive(ctx, bx + ox, by, bw, bh, cell.ci, S, tick, 0);

@@ -167,6 +167,9 @@
   .ed-tunnel-badge{position:absolute;top:-3px;right:-3px;background:#FFB545;color:#fff;
     font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;
     display:flex;align-items:center;justify-content:center;pointer-events:none;border:1.5px solid #fff}
+  .ed-lock-badge{position:absolute;top:-4px;right:-4px;background:#FF5B3B;color:#fff;
+    font-size:9px;font-weight:700;min-width:16px;height:16px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;pointer-events:none;border:1.5px solid #fff}
 
   #ed-tunnel-panel{display:none;background:rgba(61,53,72,0.10);border-radius:12px;padding:10px 12px;
     border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
@@ -302,6 +305,7 @@
   <div class="ls-actions">
     <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
     <button class="ls-editor-btn ls-block-btn" onclick="startConveyorDemo()"><span style="font-size:22px">&#129521;</span> Conveyor Block Demo</button>
+    <button class="ls-editor-btn ls-block-btn" onclick="startLockedDemo()"><span style="font-size:22px">&#128274;</span> Locked Bucket Demo</button>
     <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
   </div>
 </div>
@@ -381,6 +385,14 @@
     if (typeof initGame === 'function') initGame(conveyorBlockDemo());
     if (typeof ensureAudio === 'function') ensureAudio();
   }
+  function startLockedDemo() {
+    var ls = document.getElementById('level-screen');
+    var ed = document.getElementById('editor-screen');
+    if (ls) ls.classList.add('hidden');
+    if (ed) ed.classList.add('hidden');
+    if (typeof initGame === 'function') initGame(lockedBucketDemo());
+    if (typeof ensureAudio === 'function') ensureAudio();
+  }
 </script>
 
 <!-- Scripts: order matters -->
@@ -389,6 +401,7 @@
 <script src="js/bucket_default.js"></script>
 <script src="js/bucket_hidden.js"></script>
 <script src="js/bucket_conveyorblock.js"></script>
+<script src="js/bucket_locked.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/particles.js"></script>
