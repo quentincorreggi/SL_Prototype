@@ -38,6 +38,12 @@ function processSandCell(x, y, cx) {
   if (sandGrid[idx] < 0) return;
   var ci = sandGrid[idx];
 
+  // Gemstones ride the same physics but also SINK through sand of their own
+  // color (swapping places with it). This guarantees a gem can never be
+  // trapped on top of a pile of its own color — it always settles below it —
+  // so it can reach the belt and avoid a soft-lock.
+  if (ci >= GEM_BASE) { processGemCell(x, y, ci - GEM_BASE, cx); return; }
+
   // 1. Straight down
   var belowIdx = sandIdx(x, y + 1);
   if (sandGrid[belowIdx] < 0) {
@@ -71,6 +77,41 @@ function processSandCell(x, y, cx) {
     sandGrid[idx] = -1;
     return;
   }
+}
+
+// Gem fall: like sand, but an own-color grain below (or diagonally below) is
+// not a blocker — the gem swaps down through it (sinks). Other colors and
+// gems block as usual.
+function processGemCell(x, y, gc, cx) {
+  var idx = sandIdx(x, y);
+  var gemVal = GEM_BASE + gc;
+
+  // 1. Straight down: empty falls, own-color sinks (swap).
+  var below = sandIdx(x, y + 1);
+  var bv = sandGrid[below];
+  if (bv < 0) { sandGrid[below] = gemVal; sandGrid[idx] = -1; return; }
+  if (bv === gc) { sandGrid[below] = gemVal; sandGrid[idx] = gc; return; }
+
+  // 2. Diagonal slip — prefer the direction toward the centre.
+  var ddx = cx - x;
+  var slipFirst, slipSecond;
+  if (ddx > 0.5) { slipFirst = 1; slipSecond = -1; }
+  else if (ddx < -0.5) { slipFirst = -1; slipSecond = 1; }
+  else if ((tick + y) & 1) { slipFirst = 1; slipSecond = -1; }
+  else { slipFirst = -1; slipSecond = 1; }
+
+  if (gemSlip(x, y, idx, gemVal, gc, slipFirst)) return;
+  gemSlip(x, y, idx, gemVal, gc, slipSecond);
+}
+
+function gemSlip(x, y, idx, gemVal, gc, dir) {
+  var nx = x + dir;
+  if (nx < 0 || nx >= SAND_W) return false;
+  var ni = sandIdx(nx, y + 1);
+  var nv = sandGrid[ni];
+  if (nv < 0) { sandGrid[ni] = gemVal; sandGrid[idx] = -1; return true; }
+  if (nv === gc) { sandGrid[ni] = gemVal; sandGrid[idx] = gc; return true; }
+  return false;
 }
 
 function extractGrain(x, y) {

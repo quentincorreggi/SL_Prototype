@@ -538,30 +538,16 @@ function lockedBucketDemo() {
 // cyan/amber sand so the gem drops to the bottom, send the gem bucket onto the
 // belt, and let it sweep over the gem to open — then it collects its magenta.
 function gemBucketDemo() {
-  var grid = new Array(GRID_W * GRID_H);
-  for (var i = 0; i < grid.length; i++) grid[i] = null;
-  function placeB(r, c, ci) {
-    grid[r * GRID_W + c] = { kind: 'bucket', type: 'default', ci: ci };
-  }
-  placeB(3, 1, 0); placeB(3, 5, 0);   // cyan ×2 (clear the gem's column)
-  placeB(4, 2, 1); placeB(4, 4, 1);   // amber ×2
-  grid[5 * GRID_W + 3] = { kind: 'bucket', type: 'gembucket', ci: 2 }; // magenta gem bucket
-
-  // Vertical stripes (cyan / amber / magenta) — every color reachable.
-  var sand = new Array(IMG_W * IMG_H);
-  for (var x = 0; x < IMG_W; x++) {
-    var ci = (x < 11) ? 0 : (x < 22) ? 1 : 2;
-    for (var y = 0; y < IMG_H; y++) sand[y * IMG_W + x] = ci;
-  }
-
-  return {
-    name: 'Gem Bucket',
-    desc: 'Drop the magenta gem to the belt to unlock its bucket',
-    grid: grid,
-    sandImage: sand,
-    gems: [{ px: 5, py: 1, ci: 2 }]   // magenta gem near the top of the cyan column
-  };
+  var lvl = JSON.parse(GEM_DEMO_JSON);
+  lvl.name = 'Gem Bucket';
+  lvl.desc = 'Sink each gem down to the belt to unlock its gem bucket';
+  return lvl;
 }
+
+// Hand-authored showcase (exported from the level editor). Two gem buckets
+// (red ci8, lime ci5) each need their matching gemstone, which sinks through
+// its own color down to the belt.
+var GEM_DEMO_JSON = '{"name":"Gem Bucket","desc":"","grid":[{"kind":"wall"},null,null,null,null,null,{"kind":"wall"},{"kind":"wall"},{"kind":"bucket","type":"default","ci":8},{"kind":"bucket","type":"default","ci":1},null,{"kind":"bucket","type":"default","ci":9},{"kind":"bucket","type":"default","ci":9},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"bucket","type":"gembucket","ci":8},{"kind":"bucket","type":"gembucket","ci":5},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"bucket","type":"default","ci":8},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":10},{"kind":"wall"},{"kind":"wall"},{"kind":"bucket","type":"default","ci":4},{"kind":"bucket","type":"default","ci":4},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":10},{"kind":"bucket","type":"default","ci":10},{"kind":"wall"},{"kind":"wall"},{"kind":"bucket","type":"default","ci":5},{"kind":"bucket","type":"default","ci":5},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":5},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"},{"kind":"wall"}],"sandImage":[10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,-1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8],"beltBlocks":[],"gems":[{"px":8,"py":12,"ci":8},{"px":23,"py":9,"ci":5}]}';
 
 // ============================================================
 // Boot
