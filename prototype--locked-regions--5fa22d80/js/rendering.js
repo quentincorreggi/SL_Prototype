@@ -425,15 +425,15 @@ function drawLockedCell(ctx, x, y, w, h, cell, S, tick) {
   if (revealAnim) {
     var p = revealAnim.t / revealAnim.total;
     alpha = 1 - p;
-    scale = 1 + p * 0.4;
+    scale = 1 + p * 0.45;
   }
 
   ctx.save();
   if (scale !== 1) {
-    var cx = x + w / 2, cy = y + h / 2;
-    ctx.translate(cx, cy);
+    var midX = x + w / 2, midY = y + h / 2;
+    ctx.translate(midX, midY);
     ctx.scale(scale, scale);
-    ctx.translate(-cx, -cy);
+    ctx.translate(-midX, -midY);
   }
   ctx.globalAlpha = alpha;
 
@@ -451,21 +451,41 @@ function drawLockedCell(ctx, x, y, w, h, cell, S, tick) {
   rRect(x + 2 * S, y + 2 * S, w - 4 * S, h - 4 * S, 3 * S);
   ctx.stroke();
 
-  // Padlock icon
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = (h * 0.36) + 'px sans-serif';
+  // Live star counter — remaining stars needed
+  var grp = cell.lockGroup || 0;
+  var required  = (typeof lockGroupRequired  !== 'undefined') ? (lockGroupRequired[grp]  || 0) : 0;
+  var collected = (typeof lockGroupCollected !== 'undefined') ? (lockGroupCollected[grp] || 0) : 0;
+  var remaining = Math.max(0, required - collected);
+
+  var gColor = LOCK_GROUP_COLORS[grp % LOCK_GROUP_COLORS.length];
+
+  // Counter pill — centered, large
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  var pillW = w * 0.72, pillH = h * 0.36;
+  var pillX = x + (w - pillW) / 2, pillY = y + h * 0.18;
+  rRect(pillX, pillY, pillW, pillH, pillH / 2);
+  ctx.fill();
+
+  // Star icon left of count
+  ctx.font = (h * 0.24) + 'px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('🔒', x + w / 2, y + h * 0.42);
-
-  // Group indicator star + number
-  var grp = cell.lockGroup || 0;
-  var gColor = LOCK_GROUP_COLORS[grp % LOCK_GROUP_COLORS.length];
   ctx.fillStyle = gColor;
-  ctx.font = 'bold ' + (h * 0.20) + 'px sans-serif';
-  ctx.textAlign = 'center';
+  ctx.shadowColor = gColor;
+  ctx.shadowBlur = 4 * S;
+  ctx.fillText('✦', pillX + pillW * 0.30, pillY + pillH / 2);
+  ctx.shadowBlur = 0;
+
+  // Remaining count
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold ' + (h * 0.26) + 'px sans-serif';
+  ctx.fillText(remaining, pillX + pillW * 0.68, pillY + pillH / 2);
+
+  // Small padlock bottom-center
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = (h * 0.24) + 'px sans-serif';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('✦' + grp, x + w / 2, y + h - 2 * S);
+  ctx.fillText('🔒', x + w / 2, y + h - 2 * S);
 
   ctx.restore();
 }

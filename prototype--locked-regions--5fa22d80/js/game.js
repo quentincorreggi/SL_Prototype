@@ -58,6 +58,7 @@ function initGame(levelData) {
 
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
+  if (typeof initLockGroups === 'function') initLockGroups();
   updateTunnels();
   updateBucketActivation();
   showQuitBtn();
@@ -349,17 +350,15 @@ function checkWin() {
   showWin();
 }
 
-// Detect star buckets that just finished (popT === 1 means first pop frame)
-// and trigger the corresponding lock group reveal.
+// Detect star buckets that just finished (popT === 1 = first pop frame).
 function checkStarBucketPops() {
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
     if (!b || b.reserved) continue;
     if (b.type === 'star' && b.done && b.popT === 1) {
       var grp = (b.lockGroup != null) ? b.lockGroup : -1;
-      if (grp >= 0 && typeof triggerLockGroupReveal === 'function') {
-        triggerLockGroupReveal(grp);
-        updateBucketActivation();
+      if (grp >= 0 && typeof onStarBucketPopped === 'function') {
+        onStarBucketPopped(grp);
       }
     }
   }
