@@ -158,8 +158,10 @@ function drawBeltBucket(s, b) {
   } else {
     ctx.save();
   }
-  // Conveyor Block: locked casing + countdown badge + unlock animation.
-  if (b.type === 'conveyorblock') {
+  // Conveyor Block, or a Locked Bucket tapped onto the belt: locked casing
+  // + countdown badge + unlock animation (drawConveyorBlock handles the
+  // unlocked/normal state too).
+  if (b.type === 'conveyorblock' || b.type === 'locked') {
     var cw = size * scale, ch = size * scale;
     drawConveyorBlock(ctx, pos.x - cw / 2, pos.y - ch / 2, cw, ch, b, S, tick);
     ctx.restore();
