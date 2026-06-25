@@ -169,6 +169,24 @@ function edComputeCounts() {
   return { sand: sand, bkt: bkt };
 }
 
+// Count star buckets in the level for a given lockGroup (used by the editor
+// to show the correct required-count on locked cells).
+function edCountStarsForGroup(grp) {
+  var n = 0;
+  for (var i = 0; i < edLevel.grid.length; i++) {
+    var c = edLevel.grid[i];
+    if (!c) continue;
+    if (c.kind === 'bucket' && c.type === 'star' && (c.lockGroup || 0) === grp) n++;
+    if (c.kind === 'tunnel' && c.contents) {
+      for (var k = 0; k < c.contents.length; k++) {
+        var b = c.contents[k];
+        if (b.type === 'star' && (b.lockGroup || 0) === grp) n++;
+      }
+    }
+  }
+  return n;
+}
+
 function edAvailableColors() {
   var stats = edComputeCounts();
   var out = [];
@@ -689,10 +707,12 @@ function edApplyCellStyle(el, cell) {
   if (!cell) return;
   if (cell.kind === 'locked') {
     var gc = ED_LOCK_GRP_COLORS_CSS[(cell.lockGroup || 0) % 5];
+    var grpStars = edCountStarsForGroup(cell.lockGroup || 0);
     el.style.background = 'linear-gradient(135deg,#3A3230,#1E1A18)';
     el.style.borderColor = gc;
-    el.innerHTML = '<span class="ed-cell-dot" style="font-size:11px">🔒</span>' +
-      '<span style="position:absolute;bottom:1px;right:3px;font-size:8px;font-weight:700;color:' + gc + '">✦' + (cell.lockGroup || 0) + '</span>';
+    el.innerHTML =
+      '<span class="ed-cell-dot" style="font-size:10px;color:rgba(255,255,255,0.9)">🔒</span>' +
+      '<span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:700;color:' + gc + ';white-space:nowrap">✦' + grpStars + '</span>';
     return;
   }
   if (cell.kind === 'wall') {
