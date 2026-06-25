@@ -24,9 +24,10 @@ var edLevel = {
 };
 
 // --- Bucket-grid state ---
-var edTool = 'default';     // 'default' | 'hidden' | 'tunnel' | 'wall' | 'erase'
+var edTool = 'default';     // 'default' | 'hidden' | 'star' | 'tunnel' | 'wall' | 'lock' | 'erase'
 var edColor = 0;            // selected bucket color (constrained to available)
 var edSelectedTunnel = -1;
+var edLockGroup = 0;        // active lock group for star/lock tools (0-4)
 
 // --- Sand-image state ---
 var edSandMode = 'brush';   // 'brush' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line'
@@ -570,6 +571,8 @@ function edBuildToolbar() {
   var types = [
     { id: 'default', label: 'Bucket' },
     { id: 'hidden',  label: 'Hidden' },
+    { id: 'star',    label: '✦ Star' },
+    { id: 'lock',    label: '🔒 Lock' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
     { id: 'erase',   label: 'Erase' }
@@ -588,7 +591,7 @@ function edBuildToolbar() {
   });
   tb.appendChild(typeRow);
 
-  if (edTool === 'default' || edTool === 'hidden') {
+  if (edTool === 'default' || edTool === 'hidden' || edTool === 'star') {
     var avail = edAvailableColors();
     if (avail.length === 0) {
       var msg = document.createElement('div');
@@ -606,12 +609,55 @@ function edBuildToolbar() {
         btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
         btn.title = CLR_NAMES[ci];
         btn.textContent = '';
-        btn.onclick = function () { edColor = ci; edBuildToolbar(); };
+        (function(idx) { btn.onclick = function () { edColor = idx; edBuildToolbar(); }; })(ci);
         clrRow.appendChild(btn);
       });
       tb.appendChild(clrRow);
     }
   }
+
+  if (edTool === 'star' || edTool === 'lock') {
+    edBuildLockGroupSelector(tb);
+  }
+}
+
+// ============================================================
+// Lock group selector (used by Star and Lock tools)
+// ============================================================
+
+var ED_LOCK_GROUP_COLORS = ['#C4960A', '#0A7AC4', '#C40A4A', '#0AC45A', '#7A0AC4'];
+
+function edBuildLockGroupSelector(container) {
+  var label = document.createElement('div');
+  label.style.cssText = 'font-size:10px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:0.8px;text-align:center;margin:6px 0 3px';
+  label.textContent = 'Lock Group';
+  container.appendChild(label);
+
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:5px;justify-content:center';
+  for (var g = 0; g < 5; g++) {
+    var btn = document.createElement('button');
+    btn.className = 'ed-tool' + (edLockGroup === g ? ' active' : '');
+    btn.style.background = ED_LOCK_GROUP_COLORS[g];
+    btn.style.color = '#fff';
+    btn.style.fontWeight = '700';
+    btn.style.width = '30px';
+    btn.style.height = '30px';
+    btn.title = 'Group ' + g;
+    btn.textContent = g;
+    (function(grp) { btn.onclick = function () { edLockGroup = grp; edBuildToolbar(); }; })(g);
+    row.appendChild(btn);
+  }
+  container.appendChild(row);
+
+  var hint = document.createElement('div');
+  hint.style.cssText = 'font-size:10px;color:#9C8A70;text-align:center;margin-top:3px';
+  if (edTool === 'star') {
+    hint.textContent = 'This star unlocks group ' + edLockGroup + ' cells';
+  } else {
+    hint.textContent = 'Unlocked by group ' + edLockGroup + ' star';
+  }
+  container.appendChild(hint);
 }
 
 // ============================================================
@@ -634,11 +680,21 @@ function edBuildGrid() {
   }
 }
 
+var ED_LOCK_GRP_COLORS_CSS = ['#C4960A', '#0A7AC4', '#C40A4A', '#0AC45A', '#7A0AC4'];
+
 function edApplyCellStyle(el, cell) {
   el.innerHTML = '';
   el.style.background = 'rgba(180,165,145,0.25)';
   el.style.borderColor = 'rgba(160,140,120,0.3)';
   if (!cell) return;
+  if (cell.kind === 'locked') {
+    var gc = ED_LOCK_GRP_COLORS_CSS[(cell.lockGroup || 0) % 5];
+    el.style.background = 'linear-gradient(135deg,#3A3230,#1E1A18)';
+    el.style.borderColor = gc;
+    el.innerHTML = '<span class="ed-cell-dot" style="font-size:11px">🔒</span>' +
+      '<span style="position:absolute;bottom:1px;right:3px;font-size:8px;font-weight:700;color:' + gc + '">✦' + (cell.lockGroup || 0) + '</span>';
+    return;
+  }
   if (cell.kind === 'wall') {
     el.style.background = 'linear-gradient(135deg,#A89B88,#7C705F)';
     el.style.borderColor = '#5A4A38';
@@ -677,6 +733,14 @@ function edPaintCell(idx, eraseOverride) {
       return;
     }
     edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
+  } else if (edTool === 'star') {
+    if (edAvailableColors().length === 0) {
+      edToast('Paint sand first.');
+      return;
+    }
+    edLevel.grid[idx] = { kind: 'bucket', type: 'star', ci: edColor, lockGroup: edLockGroup };
+  } else if (edTool === 'lock') {
+    edLevel.grid[idx] = { kind: 'locked', lockGroup: edLockGroup };
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
   } else if (edTool === 'tunnel') {
@@ -980,6 +1044,7 @@ function editorTestPlay() {
 function cloneCellForLevel(c) {
   if (!c) return null;
   if (c.kind === 'wall') return { kind: 'wall' };
+  if (c.kind === 'locked') return { kind: 'locked', lockGroup: c.lockGroup || 0 };
   if (c.kind === 'tunnel') {
     return {
       kind: 'tunnel',
@@ -987,7 +1052,9 @@ function cloneCellForLevel(c) {
       contents: (c.contents || []).map(function (b) { return { type: b.type, ci: b.ci }; })
     };
   }
-  return { kind: 'bucket', type: c.type, ci: c.ci };
+  var b = { kind: 'bucket', type: c.type, ci: c.ci };
+  if (c.lockGroup != null) b.lockGroup = c.lockGroup;
+  return b;
 }
 
 function editorExportJSON() {

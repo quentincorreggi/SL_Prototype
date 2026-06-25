@@ -246,6 +246,7 @@ function drawGrid() {
       var cell = stock[idx];
       if (!cell) continue;
 
+      _currentDrawIdx = idx;
       var bx = x + pad, by = y + pad, bw = cs - pad * 2, bh = cs - pad * 2;
 
       // Shake offset on belt-full rejection
@@ -254,6 +255,10 @@ function drawGrid() {
         ox = Math.sin(rejectShake.t * 1.5) * 4 * S;
       }
 
+      if (cell.kind === 'locked') {
+        drawLockedCell(ctx, bx + ox, by, bw, bh, cell, S, tick);
+        continue;
+      }
       if (cell.kind === 'wall') {
         drawWall(ctx, bx + ox, by, bw, bh, S, tick);
         continue;
@@ -397,3 +402,73 @@ function drawTrails() {
     ctx.restore();
   }
 }
+
+// ============================================================
+// Locked region cells
+// ============================================================
+
+var LOCK_GROUP_COLORS = ['#C4960A', '#0A7AC4', '#C40A4A', '#0AC45A', '#7A0AC4'];
+
+function drawLockedCell(ctx, x, y, w, h, cell, S, tick) {
+  var revealAnim = null;
+  if (typeof lockedRevealAnims !== 'undefined') {
+    for (var i = 0; i < lockedRevealAnims.length; i++) {
+      if (lockedRevealAnims[i].idx === _currentDrawIdx) {
+        revealAnim = lockedRevealAnims[i];
+        break;
+      }
+    }
+  }
+
+  var alpha = 1;
+  var scale = 1;
+  if (revealAnim) {
+    var p = revealAnim.t / revealAnim.total;
+    alpha = 1 - p;
+    scale = 1 + p * 0.4;
+  }
+
+  ctx.save();
+  if (scale !== 1) {
+    var cx = x + w / 2, cy = y + h / 2;
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -cy);
+  }
+  ctx.globalAlpha = alpha;
+
+  // Dark panel — conceals whatever is beneath
+  var grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, '#3A3230');
+  grad.addColorStop(1, '#1E1A18');
+  ctx.fillStyle = grad;
+  rRect(x, y, w, h, 4 * S);
+  ctx.fill();
+
+  // Subtle inner border
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = 1 * S;
+  rRect(x + 2 * S, y + 2 * S, w - 4 * S, h - 4 * S, 3 * S);
+  ctx.stroke();
+
+  // Padlock icon
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = (h * 0.36) + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🔒', x + w / 2, y + h * 0.42);
+
+  // Group indicator star + number
+  var grp = cell.lockGroup || 0;
+  var gColor = LOCK_GROUP_COLORS[grp % LOCK_GROUP_COLORS.length];
+  ctx.fillStyle = gColor;
+  ctx.font = 'bold ' + (h * 0.20) + 'px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('✦' + grp, x + w / 2, y + h - 2 * S);
+
+  ctx.restore();
+}
+
+// Set by drawGrid before calling drawLockedCell so the reveal lookup works.
+var _currentDrawIdx = -1;

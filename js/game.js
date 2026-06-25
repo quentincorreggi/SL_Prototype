@@ -16,6 +16,7 @@ function initGame(levelData) {
   jumpers = [];
   particles = [];
   attractionTrails = [];
+  lockedRevealAnims = [];
   rejectShake = { idx: -1, t: 0 };
   won = false;
   gameActive = true;
@@ -88,6 +89,7 @@ function computeLevelCapacities() {
 function cloneCell(src) {
   if (!src) return null;
   if (src.kind === 'wall') return { kind: 'wall' };
+  if (src.kind === 'locked') return { kind: 'locked', lockGroup: src.lockGroup || 0 };
   if (src.kind === 'tunnel') {
     var copy = { kind: 'tunnel', dir: src.dir || 'top', contents: [], spawned: 0 };
     if (src.contents) {
@@ -98,13 +100,15 @@ function cloneCell(src) {
     return copy;
   }
   if (src.kind === 'bucket') {
-    return {
+    var b = {
       kind: 'bucket',
       type: src.type || 'default',
       ci: src.ci | 0,
       used: false,
       active: false
     };
+    if (src.lockGroup != null) b.lockGroup = src.lockGroup;
+    return b;
   }
   return null;
 }
@@ -118,6 +122,7 @@ function cloneCell(src) {
 function isPassable(cell) {
   if (!cell) return true;
   if (cell.kind === 'wall') return false;
+  if (cell.kind === 'locked') return false;
   if (cell.kind === 'tunnel') return true;
   if (cell.kind === 'bucket') return cell.used;
   return false;
@@ -222,6 +227,7 @@ function handleTap(sx, sy) {
   var idx = r * GRID_W + c;
   var cell = stock[idx];
   if (!cell || cell.kind !== 'bucket' || cell.used || !cell.active) return;
+  if (cell.kind === 'locked') return;
 
   var slot = firstFreeBeltSlot();
   if (slot < 0) {
@@ -237,7 +243,7 @@ function handleTap(sx, sy) {
   var from = gridCellCenter(r, c);
   var to = getBeltSlotPos(slot);
   jumpers.push({
-    bucket: makeBeltBucket(cell.type, cell.ci),
+    bucket: makeBeltBucket(cell.type, cell.ci, cell.lockGroup),
     slot: slot,
     from: from,
     to: to,
@@ -250,7 +256,7 @@ function handleTap(sx, sy) {
   updateBucketActivation();
 }
 
-function makeBeltBucket(type, ci) {
+function makeBeltBucket(type, ci, lockGroup) {
   return {
     type: type || 'default',
     ci: ci | 0,
@@ -260,7 +266,8 @@ function makeBeltBucket(type, ci) {
     done: false,
     popT: 0,
     bornAt: tick,
-    revealT: type === 'hidden' ? 0 : null
+    revealT: type === 'hidden' ? 0 : null,
+    lockGroup: lockGroup != null ? lockGroup : -1
   };
 }
 
@@ -299,6 +306,8 @@ function update() {
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
+  checkStarBucketPops();
+  if (typeof updateLockedRegions === 'function') updateLockedRegions();
   if (typeof tickParticles === 'function') tickParticles();
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
@@ -338,6 +347,22 @@ function checkWin() {
   won = true;
   if (typeof sfx !== 'undefined') sfx.win();
   showWin();
+}
+
+// Detect star buckets that just finished (popT === 1 means first pop frame)
+// and trigger the corresponding lock group reveal.
+function checkStarBucketPops() {
+  for (var s = 0; s < BELT_SLOTS; s++) {
+    var b = beltSlots[s];
+    if (!b || b.reserved) continue;
+    if (b.type === 'star' && b.done && b.popT === 1) {
+      var grp = (b.lockGroup != null) ? b.lockGroup : -1;
+      if (grp >= 0 && typeof triggerLockGroupReveal === 'function') {
+        triggerLockGroupReveal(grp);
+        updateBucketActivation();
+      }
+    }
+  }
 }
 
 function frame() {
