@@ -81,12 +81,20 @@ function drawSandImage() {
 
   // Grains
   var cs = L.image.cell;
+  var gemCells = null;
   for (var y = 0; y < SAND_H; y++) {
     for (var x = 0; x < SAND_W; x++) {
       var ci = sandGrid[sandIdx(x, y)];
       if (ci < 0) continue;
+      if (ci >= GEM_BASE) { (gemCells || (gemCells = [])).push(x, y, ci - GEM_BASE); continue; }
       ctx.fillStyle = COLORS[ci].fill;
       ctx.fillRect(L.image.x + x * cs, L.image.y + y * cs, cs + 0.5, cs + 0.5);
+    }
+  }
+  // Gems drawn on top of the sand so the hexagon reads clearly.
+  if (gemCells && typeof drawGemCell === 'function') {
+    for (var gi = 0; gi < gemCells.length; gi += 3) {
+      drawGemCell(ctx, gemCells[gi], gemCells[gi + 1], gemCells[gi + 2], S);
     }
   }
   ctx.restore();
@@ -157,6 +165,13 @@ function drawBeltBucket(s, b) {
     ctx.globalAlpha = Math.max(0, 1 - Math.max(0, (p - 0.4) / 0.6));
   } else {
     ctx.save();
+  }
+  // Gem Bucket: jar + gem slot (empty while locked, seated once opened).
+  if (b.type === 'gembucket') {
+    var gw = size * scale, gh = size * scale;
+    drawGemBucketBelt(ctx, pos.x - gw / 2, pos.y - gh / 2, gw, gh, b, S, tick);
+    ctx.restore();
+    return;
   }
   // Conveyor Block, or a Locked Bucket tapped onto the belt: locked casing
   // + countdown badge + unlock animation (drawConveyorBlock handles the
@@ -281,6 +296,11 @@ function drawGrid() {
           drawLockedBucket(ctx, bx + ox, by, bw, bh, cell, S, tick);
           continue;
         }
+        // Gem Bucket draws its jar + empty gem slot.
+        if (cell.type === 'gembucket') {
+          drawGemBucketGrid(ctx, bx + ox, by, bw, bh, cell, S, tick);
+          continue;
+        }
         var type = getBucketType(cell.type);
         if (cell.active) {
           type.drawActive(ctx, bx + ox, by, bw, bh, cell.ci, S, tick, 0);
@@ -401,6 +421,11 @@ function drawTrails() {
     var x = t.fromX + (t.toX - t.fromX) * p;
     var y = t.fromY + (t.toY - t.fromY) * p;
     var c = COLORS[t.ci];
+    // A gem trail flies the gemstone itself into the bucket's slot.
+    if (t.gem && typeof drawGem === 'function') {
+      drawGem(ctx, x, y, 7 * S * (1 - 0.2 * p), t.ci, S);
+      continue;
+    }
     ctx.save();
     ctx.shadowColor = c.glow;
     ctx.shadowBlur = 8 * S;

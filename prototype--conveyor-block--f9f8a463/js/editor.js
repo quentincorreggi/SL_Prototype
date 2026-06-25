@@ -21,7 +21,8 @@ var edLevel = {
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
   sandImage: new Array(IMG_W * IMG_H),
-  beltBlocks: []             // Conveyor Blocks that start on the belt
+  beltBlocks: [],            // Conveyor Blocks that start on the belt
+  gems: []                   // gemstones placed in the sand image: {px,py,ci}
 };
 
 // --- Bucket-grid state ---
@@ -62,6 +63,7 @@ function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
   edLevel.beltBlocks = [];
+  edLevel.gems = [];
   edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
@@ -85,12 +87,17 @@ function edSnapshotState() {
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
     sandImage: edLevel.sandImage.slice(),
-    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock),
+    gems: (edLevel.gems || []).map(cloneGem)
   };
 }
 
 function cloneBeltBlock(b) {
   return { ci: b.ci, unlock: b.unlock };
+}
+
+function cloneGem(g) {
+  return { px: g.px, py: g.py, ci: g.ci };
 }
 
 function edPushHistory() {
@@ -111,6 +118,7 @@ function edRestoreState(s) {
   edLevel.grid = s.grid.map(cloneCellForLevel);
   edLevel.sandImage = s.sandImage.slice();
   edLevel.beltBlocks = (s.beltBlocks || []).map(cloneBeltBlock);
+  edLevel.gems = (s.gems || []).map(cloneGem);
   // Cancel any in-progress drag so a subsequent move event won't restore
   // the pre-drag snapshot over the just-restored state.
   edDragging = false;
@@ -280,7 +288,8 @@ var SAND_TOOLS = [
   { id: 'fill',    icon: '▣', label: 'Fill' },
   { id: 'rect',    icon: '◻', label: 'Rect' },
   { id: 'ellipse', icon: '○', label: 'Oval' },
-  { id: 'line',    icon: '╲', label: 'Line' }
+  { id: 'line',    icon: '╲', label: 'Line' },
+  { id: 'gem',     icon: '⬡', label: 'Gem' }
 ];
 var BRUSH_SIZES = [1, 2, 3, 4];
 
@@ -355,10 +364,12 @@ function edBuildSandGrid() {
   if (!g) return;
   g.innerHTML = '';
   edSandCells = [];
+  var gm = edGemMap();
   for (var i = 0; i < IMG_W * IMG_H; i++) {
     var px = document.createElement('div');
     px.className = 'ed-sand-px';
     edApplySandCell(px, edLevel.sandImage[i]);
+    edDecorateGem(px, gm[i]);
     g.appendChild(px);
     edSandCells.push(px);
   }
@@ -369,8 +380,10 @@ function edRefreshSandGrid() {
     edBuildSandGrid();
     return;
   }
+  var gm = edGemMap();
   for (var i = 0; i < edSandCells.length; i++) {
     edApplySandCell(edSandCells[i], edLevel.sandImage[i]);
+    edDecorateGem(edSandCells[i], gm[i]);
   }
 }
 
@@ -425,6 +438,14 @@ function onSandPointerDown(e) {
   edDragStart = pt;
   edDragLast = pt;
 
+  if (mode === 'gem') {
+    edPlaceGem(pt.x, pt.y, rightClick ? -1 : edSandTool);
+    edRefreshSandGrid();
+    edDragging = false; // single-shot
+    edOnSandChanged();
+    edPushHistory();
+    return;
+  }
   if (mode === 'fill') {
     floodFill(pt.x, pt.y, color);
     edRefreshSandGrid();
@@ -575,6 +596,47 @@ function drawEllipseShape(x0, y0, x1, y1, ci) {
   }
 }
 
+// --- Gemstones in the sand image ---
+
+function edGemIndexAt(px, py) {
+  if (!edLevel.gems) return -1;
+  for (var i = 0; i < edLevel.gems.length; i++) {
+    if (edLevel.gems[i].px === px && edLevel.gems[i].py === py) return i;
+  }
+  return -1;
+}
+
+function edGemMap() {
+  var m = {};
+  if (edLevel.gems) {
+    for (var i = 0; i < edLevel.gems.length; i++) {
+      var g = edLevel.gems[i];
+      m[g.py * IMG_W + g.px] = g.ci;
+    }
+  }
+  return m;
+}
+
+// Toggle a gem at the pixel: placing one clears the sand beneath it so the gem
+// stands alone; clicking an existing gem removes it.
+function edPlaceGem(px, py, ci) {
+  if (!edLevel.gems) edLevel.gems = [];
+  var k = edGemIndexAt(px, py);
+  if (k >= 0) { edLevel.gems.splice(k, 1); return; }
+  if (ci < 0) return;
+  edLevel.gems.push({ px: px, py: py, ci: ci });
+  edLevel.sandImage[py * IMG_W + px] = -1;
+}
+
+function edDecorateGem(el, ci) {
+  el.innerHTML = '';
+  if (ci == null) return;
+  var m = document.createElement('div');
+  m.className = 'ed-gem-mark';
+  m.style.background = COLORS[ci].fill;
+  el.appendChild(m);
+}
+
 function edOnSandChanged() {
   edBuildToolbar();      // available bucket colors may have changed
   edBuildBeltBlocks();   // belt-block color choices follow the same palette
@@ -593,12 +655,13 @@ function edBuildToolbar() {
   var typeRow = document.createElement('div');
   typeRow.className = 'ed-type-row';
   var types = [
-    { id: 'default', label: 'Bucket' },
-    { id: 'hidden',  label: 'Hidden' },
-    { id: 'locked',  label: 'Locked' },
-    { id: 'tunnel',  label: 'Tunnel' },
-    { id: 'wall',    label: 'Wall' },
-    { id: 'erase',   label: 'Erase' }
+    { id: 'default',   label: 'Bucket' },
+    { id: 'hidden',    label: 'Hidden' },
+    { id: 'locked',    label: 'Locked' },
+    { id: 'gembucket', label: 'Gem' },
+    { id: 'tunnel',    label: 'Tunnel' },
+    { id: 'wall',      label: 'Wall' },
+    { id: 'erase',     label: 'Erase' }
   ];
   types.forEach(function (t) {
     var btn = document.createElement('button');
@@ -614,7 +677,7 @@ function edBuildToolbar() {
   });
   tb.appendChild(typeRow);
 
-  if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked') {
+  if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked' || edTool === 'gembucket') {
     var avail = edAvailableColors();
     if (avail.length === 0) {
       var msg = document.createElement('div');
@@ -725,7 +788,7 @@ function edApplyCellStyle(el, cell) {
 function edPaintCell(idx, eraseOverride) {
   if (eraseOverride || edTool === 'erase') {
     edLevel.grid[idx] = null;
-  } else if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked') {
+  } else if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked' || edTool === 'gembucket') {
     if (edAvailableColors().length === 0) {
       edToast('Paint sand first.');
       return;
@@ -979,6 +1042,7 @@ function edClearAll() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
   edLevel.beltBlocks = [];
+  edLevel.gems = [];
   edHideTunnelPanel();
   edBuildGrid();
   edRefreshSandGrid();
@@ -1160,7 +1224,8 @@ function editorTestPlay() {
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
     sandImage: edLevel.sandImage.slice(),
-    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock),
+    gems: (edLevel.gems || []).map(cloneGem)
   });
 }
 
@@ -1188,7 +1253,8 @@ function editorExportJSON() {
     desc: edLevel.desc,
     grid: edLevel.grid,
     sandImage: Array.from(edLevel.sandImage || []),
-    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock),
+    gems: (edLevel.gems || []).map(cloneGem)
   });
   ta.select();
   edToast('Exported — select + copy.');
@@ -1214,6 +1280,9 @@ function editorImportJSON() {
     while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
     edLevel.beltBlocks = (data.beltBlocks || []).map(function (b) {
       return { ci: b.ci | 0, unlock: Math.max(1, b.unlock | 0) };
+    });
+    edLevel.gems = (data.gems || []).map(function (g) {
+      return { px: g.px | 0, py: g.py | 0, ci: g.ci | 0 };
     });
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;

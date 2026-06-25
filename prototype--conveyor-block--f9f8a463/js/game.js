@@ -55,6 +55,24 @@ function initGame(levelData) {
     }
   }
 
+  // Place gemstones: each occupies the center cell of its image-pixel block as
+  // a GEM_BASE+ci particle (the 3×3 block is cleared so the gem stands alone
+  // and falls with the surrounding sand).
+  if (lvl.gems) {
+    for (var gi = 0; gi < lvl.gems.length; gi++) {
+      var gem = lvl.gems[gi];
+      if (!gem || gem.ci == null || gem.ci < 0) continue;
+      for (var ddy = 0; ddy < SAND_SUBDIV; ddy++) {
+        for (var ddx = 0; ddx < SAND_SUBDIV; ddx++) {
+          sandGrid[(gem.py * SAND_SUBDIV + ddy) * SAND_W + (gem.px * SAND_SUBDIV + ddx)] = -1;
+        }
+      }
+      var cgx = gem.px * SAND_SUBDIV + (SAND_SUBDIV >> 1);
+      var cgy = gem.py * SAND_SUBDIV + (SAND_SUBDIV >> 1);
+      sandGrid[cgy * SAND_W + cgx] = GEM_BASE + (gem.ci | 0);
+    }
+  }
+
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
   // Conveyor Blocks spawn directly onto the belt at level start.
@@ -290,6 +308,13 @@ function makeBeltBucket(type, ci, lock) {
     b.unlockAnimT = -1;
     b.badgeBumpT = 0;
   }
+  // A Gem Bucket always rides the belt locked until it collects its gem.
+  if (type === 'gembucket') {
+    b.locked = true;
+    b.hasGem = false;
+    b.gemIncoming = false;
+    b.unlockAnimT = -1;
+  }
   return b;
 }
 
@@ -345,10 +370,10 @@ function updateColorDepletion() {
   for (var ci = 0; ci < NUM_COLORS; ci++) hasSand[ci] = false;
   for (var i = 0; i < sandGrid.length; i++) {
     var c = sandGrid[i];
-    if (c >= 0) hasSand[c] = true;
+    if (c >= 0 && c < NUM_COLORS) hasSand[c] = true; // ignore gem sentinels (>= GEM_BASE)
   }
   for (var t = 0; t < attractionTrails.length; t++) {
-    hasSand[attractionTrails[t].ci] = true;
+    if (!attractionTrails[t].gem) hasSand[attractionTrails[t].ci] = true;
   }
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
@@ -505,6 +530,36 @@ function lockedBucketDemo() {
     desc: 'A locked magenta bucket — clear 2 buckets to open it',
     grid: grid,
     sandImage: sand
+  };
+}
+
+// Showcase level for the Gem Bucket: a magenta gem bucket starts locked with
+// an empty gem slot. A magenta gemstone sits up in the cyan column; clear the
+// cyan/amber sand so the gem drops to the bottom, send the gem bucket onto the
+// belt, and let it sweep over the gem to open — then it collects its magenta.
+function gemBucketDemo() {
+  var grid = new Array(GRID_W * GRID_H);
+  for (var i = 0; i < grid.length; i++) grid[i] = null;
+  function placeB(r, c, ci) {
+    grid[r * GRID_W + c] = { kind: 'bucket', type: 'default', ci: ci };
+  }
+  placeB(3, 1, 0); placeB(3, 5, 0);   // cyan ×2 (clear the gem's column)
+  placeB(4, 2, 1); placeB(4, 4, 1);   // amber ×2
+  grid[5 * GRID_W + 3] = { kind: 'bucket', type: 'gembucket', ci: 2 }; // magenta gem bucket
+
+  // Vertical stripes (cyan / amber / magenta) — every color reachable.
+  var sand = new Array(IMG_W * IMG_H);
+  for (var x = 0; x < IMG_W; x++) {
+    var ci = (x < 11) ? 0 : (x < 22) ? 1 : 2;
+    for (var y = 0; y < IMG_H; y++) sand[y * IMG_W + x] = ci;
+  }
+
+  return {
+    name: 'Gem Bucket',
+    desc: 'Drop the magenta gem to the belt to unlock its bucket',
+    grid: grid,
+    sandImage: sand,
+    gems: [{ px: 5, py: 1, ci: 2 }]   // magenta gem near the top of the cyan column
   };
 }
 

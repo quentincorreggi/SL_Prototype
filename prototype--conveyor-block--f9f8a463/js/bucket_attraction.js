@@ -24,8 +24,9 @@ function updateBucketAttraction() {
   for (var i = 0; i < BELT_SLOTS; i++) {
     var b = beltSlots[i];
     if (!b || b.reserved || b.done) continue;
-    // A locked Conveyor Block occupies a slot but collects nothing.
-    if (b.locked) continue;
+    // A locked bucket occupies a slot but collects no sand. A Gem Bucket,
+    // while locked, instead watches for its matching gem within range.
+    if (b.locked) { if (typeof tryGemUnlock === 'function') tryGemUnlock(b, i); continue; }
     if (b.pullCooldown > 0) { b.pullCooldown--; continue; }
     if ((b.capacity || 0) <= 0) continue;
     if ((b.fill || 0) >= b.capacity) continue;
@@ -102,6 +103,12 @@ function updateAttractionTrails() {
 
     t.t++;
     if (t.t >= t.dur) {
+      // A gem trail opens its bucket on arrival rather than adding fill.
+      if (t.gem) {
+        if (typeof onGemTrailArrive === 'function') onGemTrailArrive(t);
+        attractionTrails.splice(i, 1);
+        continue;
+      }
       // Arrival: credit by bucket identity (slot may have shifted on
       // belt wrap). Otherwise the grain is silently dropped — it was
       // already extracted from the image and should never re-appear.

@@ -58,6 +58,11 @@ var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc
 var CONVEYOR_UNLOCK_FRAMES = 26; // duration of a Conveyor Block's lock-break animation
 
+// Gemstone encoding inside sandGrid: a cell holding GEM_BASE + ci is a gem of
+// color ci (rides the same falling-sand CA as a normal grain). Int8Array caps
+// at 127, so this supports the full 12-color palette (100..111).
+var GEM_BASE = 100;
+
 // === GRID ===
 var GRID_W = 7, GRID_H = 7;
 
