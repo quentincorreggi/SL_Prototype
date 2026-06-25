@@ -64,7 +64,7 @@ function onBucketClearedGrid(popped) {
   var changed = false;
   for (var i = 0; i < stock.length; i++) {
     var cell = stock[i];
-    if (!cell || cell.kind !== 'bucket' || cell.type !== 'locked') continue;
+    if (!cell || cell.kind !== 'bucket' || cell.type !== 'locked' || cell.used) continue;
     if (cell.lock > 0) {
       cell.lock--;
       cell.badgeBumpT = 8;
@@ -93,7 +93,7 @@ function unlockLockedBucket(cell, idx) {
 function updateLockedBuckets() {
   for (var i = 0; i < stock.length; i++) {
     var c = stock[i];
-    if (!c || c.kind !== 'bucket' || c.type !== 'locked') continue;
+    if (!c || c.kind !== 'bucket' || c.type !== 'locked' || c.used) continue;
     if (c.badgeBumpT > 0) c.badgeBumpT--;
     if (c.lockAnimT != null && c.lockAnimT >= 0 && c.lockAnimT < CONVEYOR_UNLOCK_FRAMES) c.lockAnimT++;
   }
@@ -108,18 +108,14 @@ function drawLockedBucket(ctx, x, y, w, h, cell, S, tick) {
   var anim = cell.lockAnimT;
   var animating = anim != null && anim >= 0 && anim < CONVEYOR_UNLOCK_FRAMES;
 
-  if (locked || animating) {
-    // Color stays clearly visible while locked.
-    drawJar(ctx, x, y, w, h, cell.ci, S, 0, 0);
-  } else if (cell.active) {
-    drawJar(ctx, x, y, w, h, cell.ci, S, 0, 0);
-  } else {
-    // Unlocked but path to the belt is blocked — dim like a normal bucket.
-    ctx.save(); ctx.globalAlpha = 0.55;
-    drawJar(ctx, x, y, w, h, cell.ci, S, 0, 0);
-    ctx.restore();
-    return;
-  }
+  // Brightness follows the normal active/inactive (path-to-belt) rule, just
+  // like any other bucket — a locked bucket is still placeable when its path
+  // is open. The lock chains/badge are drawn on top regardless.
+  var dim = !cell.active && !animating;
+  ctx.save();
+  if (dim) ctx.globalAlpha = 0.55;
+  drawJar(ctx, x, y, w, h, cell.ci, S, 0, 0);
+  ctx.restore();
 
   if (locked) {
     // Light chain accents (kept thin so the color reads through) + padlock.

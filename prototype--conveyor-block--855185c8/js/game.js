@@ -240,15 +240,7 @@ function handleTap(sx, sy) {
   if (r < 0 || r >= GRID_H || c < 0 || c >= GRID_W) return;
   var idx = r * GRID_W + c;
   var cell = stock[idx];
-  if (!cell || cell.kind !== 'bucket' || cell.used) return;
-  // Locked bucket: obeys the normal path/slot rules, but the counter must
-  // reach 0 first. Reject with the same shake/cue as a belt-full tap.
-  if (cell.type === 'locked' && cell.lock > 0) {
-    rejectShake = { idx: idx, t: 14 };
-    if (typeof sfx !== 'undefined') sfx.reject();
-    return;
-  }
-  if (!cell.active) return;
+  if (!cell || cell.kind !== 'bucket' || cell.used || !cell.active) return;
 
   var slot = firstFreeBeltSlot();
   if (slot < 0) {
@@ -264,7 +256,7 @@ function handleTap(sx, sy) {
   var from = gridCellCenter(r, c);
   var to = getBeltSlotPos(slot);
   jumpers.push({
-    bucket: makeBeltBucket(cell.type, cell.ci),
+    bucket: makeBeltBucket(cell.type, cell.ci, cell.type === 'locked' ? cell.lock : 0),
     slot: slot,
     from: from,
     to: to,
@@ -277,8 +269,8 @@ function handleTap(sx, sy) {
   updateBucketActivation();
 }
 
-function makeBeltBucket(type, ci) {
-  return {
+function makeBeltBucket(type, ci, lock) {
+  var b = {
     type: type || 'default',
     ci: ci | 0,
     fill: 0,
@@ -289,6 +281,16 @@ function makeBeltBucket(type, ci) {
     bornAt: tick,
     revealT: type === 'hidden' ? 0 : null
   };
+  // A Locked Bucket carries its lock onto the belt: it loops without
+  // collecting (like a Conveyor Block) until the counter reaches 0.
+  if (type === 'locked' && lock > 0) {
+    b.locked = true;
+    b.unlockLeft = lock | 0;
+    b.unlockNeed = lock | 0;
+    b.unlockAnimT = -1;
+    b.badgeBumpT = 0;
+  }
+  return b;
 }
 
 function gridCellCenter(r, c) {
