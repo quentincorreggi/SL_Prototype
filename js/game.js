@@ -20,6 +20,7 @@ function initGame(levelData) {
   won = false;
   gameActive = true;
   hideWin();
+  if (typeof initLaser === 'function') initLaser();
 
   // Build stock from level data (or use a demo level).
   stock = new Array(GRID_W * GRID_H);
@@ -300,6 +301,7 @@ function update() {
   updateAttractionTrails();
   updateColorDepletion();
   if (typeof tickParticles === 'function') tickParticles();
+  if (typeof updateLaser === 'function') updateLaser();
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
   if (updateTunnels()) updateBucketActivation();

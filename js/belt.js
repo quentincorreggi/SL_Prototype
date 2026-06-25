@@ -50,6 +50,7 @@ function updateBelt() {
       }
       if (b.popT >= BUCKET_POP_FRAMES) {
         beltSlots[s] = null;
+        if (typeof onBucketPopped === 'function') onBucketPopped();
       }
     }
     if (b && b.revealT != null && b.revealT < 12) b.revealT++;

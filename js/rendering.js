@@ -39,6 +39,8 @@ function drawFrame() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
   drawSandImage();
+  if (typeof drawLaserBar === 'function') drawLaserBar();
+  if (typeof drawLaserEffect === 'function') drawLaserEffect();
   drawBelt();
   drawGrid();
   drawJumpers();
