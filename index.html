@@ -124,7 +124,11 @@
     background:rgba(120,100,80,0.30);padding:2px;border-radius:8px;
     user-select:none;-webkit-user-select:none;touch-action:none;cursor:crosshair}
   .ed-sand-px{aspect-ratio:1;background:#F4ECDB;-webkit-tap-highlight-color:transparent;
-    pointer-events:none;border:0.5px solid rgba(120,100,80,0.08)}
+    pointer-events:none;border:0.5px solid rgba(120,100,80,0.08);
+    display:flex;align-items:center;justify-content:center}
+  .ed-gem-mark{width:120%;height:120%;
+    clip-path:polygon(50% 0,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);
+    border:1px solid rgba(255,255,255,0.9);box-shadow:0 0 3px rgba(0,0,0,0.5)}
 
   /* Right pane: capacities, toolbar, grid, tunnel panel */
   .ed-right-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 14px 14px;
@@ -306,6 +310,7 @@
     <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
     <button class="ls-editor-btn ls-block-btn" onclick="startConveyorDemo()"><span style="font-size:22px">&#129521;</span> Conveyor Block Demo</button>
     <button class="ls-editor-btn ls-block-btn" onclick="startLockedDemo()"><span style="font-size:22px">&#128274;</span> Locked Bucket Demo</button>
+    <button class="ls-editor-btn ls-block-btn" onclick="startGemDemo()"><span style="font-size:22px">&#128142;</span> Gem Bucket Demo</button>
     <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
   </div>
 </div>
@@ -393,6 +398,14 @@
     if (typeof initGame === 'function') initGame(lockedBucketDemo());
     if (typeof ensureAudio === 'function') ensureAudio();
   }
+  function startGemDemo() {
+    var ls = document.getElementById('level-screen');
+    var ed = document.getElementById('editor-screen');
+    if (ls) ls.classList.add('hidden');
+    if (ed) ed.classList.add('hidden');
+    if (typeof initGame === 'function') initGame(gemBucketDemo());
+    if (typeof ensureAudio === 'function') ensureAudio();
+  }
 </script>
 
 <!-- Scripts: order matters -->
@@ -402,6 +415,7 @@
 <script src="js/bucket_hidden.js"></script>
 <script src="js/bucket_conveyorblock.js"></script>
 <script src="js/bucket_locked.js"></script>
+<script src="js/bucket_gem.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/particles.js"></script>

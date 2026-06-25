@@ -153,7 +153,12 @@ function relieveConveyorSoftlock() {
   // Nothing else can ever be cleared, so locked items would never tick down —
   // force them open to keep the level winnable.
   for (var k = 0; k < lockedBelt.length; k++) {
-    unlockConveyorBlock(beltSlots[lockedBelt[k]], lockedBelt[k]);
+    var bb = beltSlots[lockedBelt[k]];
+    if (bb && bb.type === 'gembucket' && typeof forceUnlockGemBucket === 'function') {
+      forceUnlockGemBucket(bb, lockedBelt[k]);
+    } else {
+      unlockConveyorBlock(bb, lockedBelt[k]);
+    }
   }
   var anyGrid = false;
   for (var g = 0; g < lockedGrid.length; g++) {
