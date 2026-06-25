@@ -27,6 +27,12 @@ var sfx = {
   drop:  function () { tone(400, 0.08, 'sine', 0.04, 200); },
   pull:  function () { tone(600, 0.05, 'triangle', 0.04, 900); },
   reject:function () { tone(180, 0.10, 'square', 0.06, 110); },
+  unlock:function () {
+    // Rising two-note chime + a little sparkle to signal the lock breaking.
+    tone(440, 0.10, 'triangle', 0.10, 660);
+    setTimeout(function () { tone(660, 0.16, 'triangle', 0.10, 990); }, 90);
+    setTimeout(function () { tone(1320, 0.10, 'sine', 0.06, 1760); }, 180);
+  },
   win:   function () {
     [523, 659, 784, 1047, 1319, 1568].forEach(function (f, i) {
       setTimeout(function () { tone(f, 0.25, 'sine', 0.12); }, i * 100);

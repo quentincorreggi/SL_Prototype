@@ -20,13 +20,18 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(IMG_W * IMG_H)
+  sandImage: new Array(IMG_W * IMG_H),
+  beltBlocks: []             // Conveyor Blocks that start on the belt
 };
 
 // --- Bucket-grid state ---
 var edTool = 'default';     // 'default' | 'hidden' | 'tunnel' | 'wall' | 'erase'
 var edColor = 0;            // selected bucket color (constrained to available)
 var edSelectedTunnel = -1;
+
+// --- Belt-block tool state ---
+var edBlockColor = 0;       // selected belt-block color (constrained to available)
+var edBlockX = 2;           // selected unlock threshold for the next block
 
 // --- Sand-image state ---
 var edSandMode = 'brush';   // 'brush' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line'
@@ -53,10 +58,12 @@ var ED_HISTORY_LIMIT = 80;
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.beltBlocks = [];
   edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
   edBuildGrid();
+  edBuildBeltBlocks();
   edBindSandPointer();
   edRefreshLiveSections();
   edHideTunnelPanel();
@@ -74,8 +81,13 @@ function edSnapshotState() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
   };
+}
+
+function cloneBeltBlock(b) {
+  return { ci: b.ci, unlock: b.unlock };
 }
 
 function edPushHistory() {
@@ -95,6 +107,7 @@ function edRestoreState(s) {
   edLevel.desc = s.desc;
   edLevel.grid = s.grid.map(cloneCellForLevel);
   edLevel.sandImage = s.sandImage.slice();
+  edLevel.beltBlocks = (s.beltBlocks || []).map(cloneBeltBlock);
   // Cancel any in-progress drag so a subsequent move event won't restore
   // the pre-drag snapshot over the just-restored state.
   edDragging = false;
@@ -107,6 +120,7 @@ function edRestoreState(s) {
   edRefreshSandGrid();
   edBuildGrid();
   edBuildToolbar();
+  edBuildBeltBlocks();
   edSelectedTunnel = -1;
   edHideTunnelPanel();
   edRefreshLiveSections();
@@ -163,6 +177,13 @@ function edComputeCounts() {
     if (cell.kind === 'bucket') bkt[cell.ci]++;
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bkt[cell.contents[k].ci]++;
+    }
+  }
+  // Conveyor Blocks on the belt count as buckets of their color.
+  if (edLevel.beltBlocks) {
+    for (var i = 0; i < edLevel.beltBlocks.length; i++) {
+      var bb = edLevel.beltBlocks[i];
+      if (bb && bb.ci >= 0 && bb.ci < NUM_COLORS) bkt[bb.ci]++;
     }
   }
   return { sand: sand, bkt: bkt };
@@ -553,6 +574,7 @@ function drawEllipseShape(x0, y0, x1, y1, ci) {
 
 function edOnSandChanged() {
   edBuildToolbar();      // available bucket colors may have changed
+  edBuildBeltBlocks();   // belt-block color choices follow the same palette
   edRefreshLiveSections();
 }
 
@@ -788,16 +810,146 @@ function edHideTunnelPanel() {
 }
 
 // ============================================================
+// Belt-blocks panel — Conveyor Blocks that start locked on the belt
+// ============================================================
+
+// Number of clearable buckets in the level OTHER than the block being
+// configured — used for the unlock-threshold warning.
+function edCountOtherBuckets() {
+  var n = 0;
+  for (var i = 0; i < edLevel.grid.length; i++) {
+    var c = edLevel.grid[i];
+    if (!c) continue;
+    if (c.kind === 'bucket') n++;
+    else if (c.kind === 'tunnel' && c.contents) n += c.contents.length;
+  }
+  n += (edLevel.beltBlocks ? edLevel.beltBlocks.length : 0);
+  return n;
+}
+
+function edBuildBeltBlocks() {
+  var el = document.getElementById('ed-belt-blocks');
+  if (!el) return;
+  if (!edLevel.beltBlocks) edLevel.beltBlocks = [];
+  el.innerHTML = '';
+
+  var title = document.createElement('div');
+  title.className = 'ed-section-title';
+  title.innerHTML = '<span class="icon">🔒</span> Belt Blocks (locked, start on belt)';
+  el.appendChild(title);
+
+  // Existing blocks as removable chips.
+  var list = document.createElement('div');
+  list.className = 'ed-blocks-list';
+  if (edLevel.beltBlocks.length === 0) {
+    var empty = document.createElement('div');
+    empty.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic';
+    empty.textContent = 'None yet — add one below.';
+    list.appendChild(empty);
+  }
+  edLevel.beltBlocks.forEach(function (spec, i) {
+    var c = COLORS[spec.ci];
+    var chip = document.createElement('div');
+    chip.className = 'ed-block-chip';
+    chip.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+    chip.title = CLR_NAMES[spec.ci] + ' block · unlocks after ' + spec.unlock + ' clears · click to remove';
+    chip.innerHTML = '<span class="ed-block-lock">🔒</span><span class="ed-block-x">' + spec.unlock + '</span>';
+    chip.onclick = function () {
+      edLevel.beltBlocks.splice(i, 1);
+      edBuildBeltBlocks();
+      edRefreshLiveSections();
+      edPushHistory();
+    };
+    list.appendChild(chip);
+  });
+  el.appendChild(list);
+
+  var avail = edAvailableColors();
+  if (avail.length === 0) {
+    var msg = document.createElement('div');
+    msg.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic';
+    msg.textContent = 'Paint sand first to add belt blocks.';
+    el.appendChild(msg);
+    return;
+  }
+  if (avail.indexOf(edBlockColor) < 0) edBlockColor = avail[0];
+
+  // Color picker (restricted to colors present in the sand image).
+  var clrRow = document.createElement('div');
+  clrRow.className = 'ed-block-colors';
+  avail.forEach(function (ci) {
+    var c = COLORS[ci];
+    var btn = document.createElement('button');
+    btn.className = 'ed-tool' + (edBlockColor === ci ? ' active' : '');
+    btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+    btn.title = CLR_NAMES[ci];
+    btn.onclick = function () { edBlockColor = ci; edBuildBeltBlocks(); };
+    clrRow.appendChild(btn);
+  });
+  el.appendChild(clrRow);
+
+  // Unlock-threshold stepper + Add button.
+  var ctrl = document.createElement('div');
+  ctrl.className = 'ed-block-ctrl';
+  var minus = document.createElement('button');
+  minus.className = 'ed-step-btn';
+  minus.textContent = '−';
+  minus.onclick = function () { edBlockX = Math.max(1, edBlockX - 1); edBuildBeltBlocks(); };
+  var val = document.createElement('span');
+  val.className = 'ed-step-val';
+  val.textContent = 'Unlock at ' + edBlockX;
+  var plus = document.createElement('button');
+  plus.className = 'ed-step-btn';
+  plus.textContent = '+';
+  plus.onclick = function () { edBlockX = Math.min(20, edBlockX + 1); edBuildBeltBlocks(); };
+  var add = document.createElement('button');
+  add.className = 'ed-block-add';
+  add.textContent = '+ Add block';
+  var atMax = edLevel.beltBlocks.length >= BELT_SLOTS - 1;
+  if (atMax) {
+    add.disabled = true;
+    add.title = 'Max ' + (BELT_SLOTS - 1) + ' belt blocks (a free slot is needed to play).';
+  }
+  add.onclick = function () {
+    if (edLevel.beltBlocks.length >= BELT_SLOTS - 1) {
+      edToast('Max ' + (BELT_SLOTS - 1) + ' belt blocks.');
+      return;
+    }
+    edLevel.beltBlocks.push({ ci: edBlockColor, unlock: edBlockX });
+    edBuildBeltBlocks();
+    edRefreshLiveSections();
+    edPushHistory();
+  };
+  ctrl.appendChild(minus);
+  ctrl.appendChild(val);
+  ctrl.appendChild(plus);
+  ctrl.appendChild(add);
+  el.appendChild(ctrl);
+
+  // Validation warning: X must stay below the number of other buckets,
+  // otherwise the block can never reach its unlock threshold.
+  var others = edCountOtherBuckets();
+  if (edBlockX >= others) {
+    var warn = document.createElement('div');
+    warn.style.cssText = 'font-size:11px;color:#A53030;margin-top:5px;font-weight:600';
+    warn.textContent = '⚠ Unlock (' + edBlockX + ') ≥ other buckets (' + others + ') — may never unlock.';
+    el.appendChild(warn);
+  }
+}
+
+// ============================================================
 // Quick actions
 // ============================================================
 
 function edClearAll() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.beltBlocks = [];
   edHideTunnelPanel();
   edBuildGrid();
   edRefreshSandGrid();
   edBuildToolbar();
+  edBuildBeltBlocks();
   edRefreshLiveSections();
   edPushHistory();
 }
@@ -973,7 +1125,8 @@ function editorTestPlay() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
   });
 }
 
@@ -998,7 +1151,8 @@ function editorExportJSON() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid,
-    sandImage: Array.from(edLevel.sandImage || [])
+    sandImage: Array.from(edLevel.sandImage || []),
+    beltBlocks: (edLevel.beltBlocks || []).map(cloneBeltBlock)
   });
   ta.select();
   edToast('Exported — select + copy.');
@@ -1022,11 +1176,15 @@ function editorImportJSON() {
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
     edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
     while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
+    edLevel.beltBlocks = (data.beltBlocks || []).map(function (b) {
+      return { ci: b.ci | 0, unlock: Math.max(1, b.unlock | 0) };
+    });
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();
     edBuildGrid();
     edBuildToolbar();
+    edBuildBeltBlocks();
     edRefreshLiveSections();
     ta.style.display = 'none';
     edToast('Imported.');

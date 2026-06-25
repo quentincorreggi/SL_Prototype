@@ -57,6 +57,8 @@ function initGame(levelData) {
 
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
+  // Conveyor Blocks spawn directly onto the belt at level start.
+  placeConveyorBlocks(lvl);
   updateTunnels();
   updateBucketActivation();
   showQuitBtn();
@@ -76,6 +78,13 @@ function computeLevelCapacities() {
     if (cell.kind === 'bucket') bktPer[cell.ci]++;
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bktPer[cell.contents[k].ci]++;
+    }
+  }
+  // Conveyor Blocks count as buckets of their color (they spawn on the belt).
+  if (currentLevel && currentLevel.beltBlocks) {
+    for (var i = 0; i < currentLevel.beltBlocks.length; i++) {
+      var spec = currentLevel.beltBlocks[i];
+      if (spec && spec.ci >= 0 && spec.ci < NUM_COLORS) bktPer[spec.ci]++;
     }
   }
   for (var ci = 0; ci < NUM_COLORS; ci++) {
@@ -299,6 +308,7 @@ function update() {
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
+  if (typeof relieveConveyorSoftlock === 'function') relieveConveyorSoftlock();
   if (typeof tickParticles === 'function') tickParticles();
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
@@ -322,6 +332,8 @@ function updateColorDepletion() {
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
     if (!b || b.reserved || b.done) continue;
+    // A locked Conveyor Block must unlock before it can pop — never auto-pop it.
+    if (b.locked) continue;
     if (!hasSand[b.ci]) b.done = true;
   }
 }
@@ -408,6 +420,40 @@ function demoLevel() {
     }
   }
   return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+}
+
+// Showcase level for the Conveyor Block mechanic: one magenta block sits
+// locked on the belt at start (unlock after 2 clears). Clear the cyan and
+// amber buckets to unlock it, then watch it collect the magenta sand.
+function conveyorBlockDemo() {
+  var grid = new Array(GRID_W * GRID_H);
+  for (var i = 0; i < grid.length; i++) grid[i] = null;
+  function placeB(r, c, ci) {
+    grid[r * GRID_W + c] = { kind: 'bucket', type: 'default', ci: ci };
+  }
+  // cyan (0) ×3, amber (1) ×3, magenta (2) ×1 — all in lower rows, active
+  // from the start (open path to the belt above).
+  placeB(3, 1, 0); placeB(3, 3, 1); placeB(3, 5, 0);
+  placeB(4, 2, 1); placeB(4, 4, 2);
+  placeB(5, 1, 0); placeB(5, 5, 1);
+
+  // Sand image: three VERTICAL stripes (cyan / amber / magenta). Vertical
+  // stripes keep every color reachable from the belt — as a bucket sweeps
+  // horizontally it passes over its color's columns and pulls from the
+  // bottom. (Horizontal bands would hide upper colors behind lower ones.)
+  var sand = new Array(IMG_W * IMG_H);
+  for (var x = 0; x < IMG_W; x++) {
+    var ci = (x < 11) ? 0 : (x < 22) ? 1 : 2;
+    for (var y = 0; y < IMG_H; y++) sand[y * IMG_W + x] = ci;
+  }
+
+  return {
+    name: 'Conveyor Block',
+    desc: '1 locked magenta block — clear 2 buckets to free it',
+    grid: grid,
+    sandImage: sand,
+    beltBlocks: [{ ci: 2, unlock: 2 }]
+  };
 }
 
 // ============================================================

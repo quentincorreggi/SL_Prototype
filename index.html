@@ -36,6 +36,7 @@
     transition:transform 0.18s;display:flex;align-items:center;gap:10px}
   .ls-editor-btn:hover{transform:scale(1.06)}.ls-editor-btn:active{transform:scale(0.94)}
   .ls-play-btn{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 6px 22px rgba(78,230,140,0.35)}
+  .ls-block-btn{background:linear-gradient(135deg,#6E6478,#39323F);box-shadow:0 6px 22px rgba(57,50,63,0.35)}
 
   /* === Calibration === */
   #cal-toggle{position:absolute;top:10px;right:10px;z-index:30;width:40px;height:40px;border-radius:12px;border:none;
@@ -169,6 +170,32 @@
 
   #ed-tunnel-panel{display:none;background:rgba(61,53,72,0.10);border-radius:12px;padding:10px 12px;
     border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
+
+  /* Belt-blocks panel */
+  #ed-belt-blocks{background:rgba(57,50,63,0.10);border-radius:12px;padding:10px 12px;
+    border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
+  .ed-blocks-list{display:flex;flex-wrap:wrap;gap:5px;min-height:30px;padding:6px;
+    background:rgba(0,0,0,0.04);border-radius:8px;margin-bottom:6px;align-items:center}
+  .ed-block-chip{position:relative;width:32px;height:32px;border-radius:7px;cursor:pointer;
+    border:2px solid rgba(20,16,24,0.6);display:flex;align-items:center;justify-content:center;
+    box-shadow:inset 0 0 0 6px rgba(26,22,30,0.35);transition:transform 0.12s}
+  .ed-block-chip:hover{transform:scale(1.12)}
+  .ed-block-lock{font-size:11px;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.4))}
+  .ed-block-x{position:absolute;top:-5px;right:-5px;background:#FF5B3B;color:#fff;font-size:9px;
+    font-weight:700;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;
+    justify-content:center;border:1.5px solid #fff}
+  .ed-block-colors{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;margin-bottom:6px}
+  .ed-block-ctrl{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .ed-step-btn{width:26px;height:26px;border:none;border-radius:7px;cursor:pointer;
+    background:rgba(110,100,120,0.35);color:#39323F;font-size:16px;font-weight:700;
+    font-family:'Fredoka',sans-serif;display:flex;align-items:center;justify-content:center}
+  .ed-step-btn:hover{background:rgba(110,100,120,0.55)}
+  .ed-step-val{font-size:12px;font-weight:600;color:#5A4A38;min-width:78px;text-align:center}
+  .ed-block-add{padding:6px 14px;border:none;border-radius:8px;cursor:pointer;
+    font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,#6E6478,#39323F);box-shadow:0 2px 8px rgba(57,50,63,0.3)}
+  .ed-block-add:hover{transform:scale(1.05)}
+  .ed-block-add[disabled]{opacity:0.45;cursor:not-allowed}
   .ed-section-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
     margin-bottom:8px;display:flex;align-items:center;gap:6px}
   .ed-section-title .icon{font-size:15px}
@@ -274,6 +301,7 @@
   </div>
   <div class="ls-actions">
     <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
+    <button class="ls-editor-btn ls-block-btn" onclick="startConveyorDemo()"><span style="font-size:22px">&#129521;</span> Conveyor Block Demo</button>
     <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
   </div>
 </div>
@@ -308,6 +336,7 @@
         <div id="ed-capacities"></div>
         <div id="ed-toolbar"></div>
         <div class="ed-grid-area"><div id="ed-grid"></div></div>
+        <div id="ed-belt-blocks"></div>
         <div class="ed-quick">
           <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
           <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
@@ -344,6 +373,14 @@
     if (typeof initGame === 'function') initGame();
     if (typeof ensureAudio === 'function') ensureAudio();
   }
+  function startConveyorDemo() {
+    var ls = document.getElementById('level-screen');
+    var ed = document.getElementById('editor-screen');
+    if (ls) ls.classList.add('hidden');
+    if (ed) ed.classList.add('hidden');
+    if (typeof initGame === 'function') initGame(conveyorBlockDemo());
+    if (typeof ensureAudio === 'function') ensureAudio();
+  }
 </script>
 
 <!-- Scripts: order matters -->
@@ -351,6 +388,7 @@
 <script src="js/registry.js"></script>
 <script src="js/bucket_default.js"></script>
 <script src="js/bucket_hidden.js"></script>
+<script src="js/bucket_conveyorblock.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/particles.js"></script>

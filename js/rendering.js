@@ -158,6 +158,13 @@ function drawBeltBucket(s, b) {
   } else {
     ctx.save();
   }
+  // Conveyor Block: locked casing + countdown badge + unlock animation.
+  if (b.type === 'conveyorblock') {
+    var cw = size * scale, ch = size * scale;
+    drawConveyorBlock(ctx, pos.x - cw / 2, pos.y - ch / 2, cw, ch, b, S, tick);
+    ctx.restore();
+    return;
+  }
   // Reveal-cross-fade for hidden type
   var displayCi = b.ci;
   var revealAlpha = 1;

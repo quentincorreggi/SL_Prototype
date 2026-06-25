@@ -47,12 +47,17 @@ function updateBelt() {
           var pos = getBeltSlotPos(s);
           spawnBurst(pos.x, pos.y, COLORS[b.ci].fill, 14);
         }
+        // A bucket clearing ticks down every locked Conveyor Block.
+        if (typeof onBucketCleared === 'function') onBucketCleared(b);
       }
       if (b.popT >= BUCKET_POP_FRAMES) {
         beltSlots[s] = null;
       }
     }
     if (b && b.revealT != null && b.revealT < 12) b.revealT++;
+    // Conveyor Block animation timers.
+    if (b.badgeBumpT > 0) b.badgeBumpT--;
+    if (b.unlockAnimT != null && b.unlockAnimT >= 0 && b.unlockAnimT < CONVEYOR_UNLOCK_FRAMES) b.unlockAnimT++;
   }
 }
 
