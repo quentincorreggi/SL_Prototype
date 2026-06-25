@@ -107,13 +107,21 @@ function cloneCell(src) {
     return copy;
   }
   if (src.kind === 'bucket') {
-    return {
+    var b = {
       kind: 'bucket',
       type: src.type || 'default',
       ci: src.ci | 0,
       used: false,
       active: false
     };
+    if (b.type === 'locked') {
+      var need = Math.max(1, (src.lock != null ? src.lock : 1) | 0);
+      b.lock = need;
+      b.lockNeed = need;
+      b.lockAnimT = -1;
+      b.badgeBumpT = 0;
+    }
+    return b;
   }
   return null;
 }
@@ -160,6 +168,8 @@ function updateBucketActivation() {
       var idx = r * GRID_W + c;
       var cell = stock[idx];
       if (!cell || cell.kind !== 'bucket' || cell.used) continue;
+      // A locked grid bucket is never tappable until its counter hits 0.
+      if (cell.type === 'locked' && cell.lock > 0) { cell.active = false; continue; }
       var active = false;
       if (r === 0) active = true;
       else if (visited[idx - GRID_W]) active = true;
@@ -308,6 +318,7 @@ function update() {
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
+  if (typeof updateLockedBuckets === 'function') updateLockedBuckets();
   if (typeof relieveConveyorSoftlock === 'function') relieveConveyorSoftlock();
   if (typeof tickParticles === 'function') tickParticles();
   // Tunnels poll continuously — a queued bucket spawns the moment its
@@ -453,6 +464,37 @@ function conveyorBlockDemo() {
     grid: grid,
     sandImage: sand,
     beltBlocks: [{ ci: 2, unlock: 2 }]
+  };
+}
+
+// Showcase level for the grid Locked Bucket variant: a magenta bucket sits
+// locked in the grid (visible color, counter = 2). Clear two other buckets to
+// open it, then tap it to send it onto the belt to collect its magenta sand.
+function lockedBucketDemo() {
+  var grid = new Array(GRID_W * GRID_H);
+  for (var i = 0; i < grid.length; i++) grid[i] = null;
+  function placeB(r, c, ci) {
+    grid[r * GRID_W + c] = { kind: 'bucket', type: 'default', ci: ci };
+  }
+  // Locked magenta bucket up top (nothing below it, so it blocks no one).
+  grid[0 * GRID_W + 3] = { kind: 'bucket', type: 'locked', ci: 2, lock: 2 };
+  // Normal buckets to clear: cyan (0) ×2, amber (1) ×2, magenta (2) ×1.
+  placeB(3, 1, 0); placeB(4, 2, 0);
+  placeB(3, 5, 1); placeB(4, 4, 1);
+  placeB(5, 3, 2);
+
+  // Vertical stripes keep every color reachable from the belt.
+  var sand = new Array(IMG_W * IMG_H);
+  for (var x = 0; x < IMG_W; x++) {
+    var ci = (x < 11) ? 0 : (x < 22) ? 1 : 2;
+    for (var y = 0; y < IMG_H; y++) sand[y * IMG_W + x] = ci;
+  }
+
+  return {
+    name: 'Locked Bucket',
+    desc: 'A locked magenta bucket — clear 2 buckets to open it',
+    grid: grid,
+    sandImage: sand
   };
 }
 

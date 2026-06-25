@@ -33,6 +33,9 @@ var edSelectedTunnel = -1;
 var edBlockColor = 0;       // selected belt-block color (constrained to available)
 var edBlockX = 2;           // selected unlock threshold for the next block
 
+// --- Locked-bucket tool state ---
+var edLockX = 2;            // lock counter for the next locked grid bucket
+
 // --- Sand-image state ---
 var edSandMode = 'brush';   // 'brush' | 'eraser' | 'fill' | 'rect' | 'ellipse' | 'line'
 var edSandTool = 0;         // selected color
@@ -592,6 +595,7 @@ function edBuildToolbar() {
   var types = [
     { id: 'default', label: 'Bucket' },
     { id: 'hidden',  label: 'Hidden' },
+    { id: 'locked',  label: 'Locked' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
     { id: 'erase',   label: 'Erase' }
@@ -610,7 +614,7 @@ function edBuildToolbar() {
   });
   tb.appendChild(typeRow);
 
-  if (edTool === 'default' || edTool === 'hidden') {
+  if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked') {
     var avail = edAvailableColors();
     if (avail.length === 0) {
       var msg = document.createElement('div');
@@ -632,6 +636,27 @@ function edBuildToolbar() {
         clrRow.appendChild(btn);
       });
       tb.appendChild(clrRow);
+
+      // Lock-counter stepper for the Locked Bucket tool.
+      if (edTool === 'locked') {
+        var ctrl = document.createElement('div');
+        ctrl.className = 'ed-block-ctrl';
+        var minus = document.createElement('button');
+        minus.className = 'ed-step-btn';
+        minus.textContent = '−';
+        minus.onclick = function () { edLockX = Math.max(1, edLockX - 1); edBuildToolbar(); };
+        var val = document.createElement('span');
+        val.className = 'ed-step-val';
+        val.textContent = 'Lock count ' + edLockX;
+        var plus = document.createElement('button');
+        plus.className = 'ed-step-btn';
+        plus.textContent = '+';
+        plus.onclick = function () { edLockX = Math.min(20, edLockX + 1); edBuildToolbar(); };
+        ctrl.appendChild(minus);
+        ctrl.appendChild(val);
+        ctrl.appendChild(plus);
+        tb.appendChild(ctrl);
+      }
     }
   }
 }
@@ -687,18 +712,27 @@ function edApplyCellStyle(el, cell) {
     el.style.background = st.background;
     el.style.borderColor = st.borderColor;
     el.innerHTML = type.editorCellHTML(cell.ci);
+    // Locked Bucket: overlay its lock-counter badge.
+    if (cell.type === 'locked') {
+      var badge = document.createElement('span');
+      badge.className = 'ed-lock-badge';
+      badge.textContent = (cell.lock != null ? cell.lock : 1);
+      el.appendChild(badge);
+    }
   }
 }
 
 function edPaintCell(idx, eraseOverride) {
   if (eraseOverride || edTool === 'erase') {
     edLevel.grid[idx] = null;
-  } else if (edTool === 'default' || edTool === 'hidden') {
+  } else if (edTool === 'default' || edTool === 'hidden' || edTool === 'locked') {
     if (edAvailableColors().length === 0) {
       edToast('Paint sand first.');
       return;
     }
-    edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
+    var nb = { kind: 'bucket', type: edTool, ci: edColor };
+    if (edTool === 'locked') nb.lock = edLockX;
+    edLevel.grid[idx] = nb;
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
   } else if (edTool === 'tunnel') {
@@ -1140,7 +1174,9 @@ function cloneCellForLevel(c) {
       contents: (c.contents || []).map(function (b) { return { type: b.type, ci: b.ci }; })
     };
   }
-  return { kind: 'bucket', type: c.type, ci: c.ci };
+  var o = { kind: 'bucket', type: c.type, ci: c.ci };
+  if (c.type === 'locked') o.lock = Math.max(1, (c.lock != null ? c.lock : 1) | 0);
+  return o;
 }
 
 function editorExportJSON() {
