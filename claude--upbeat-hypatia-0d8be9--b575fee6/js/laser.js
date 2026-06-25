@@ -46,18 +46,20 @@ function onBucketPopped() {
   }
 }
 
-// Pick a random image row that contains at least one sand grain.
+// Pick a random image row between the topmost sand row and the bottom of the board.
 function pickLaserTargetRow() {
-  var valid = [];
-  for (var iy = 0; iy < IMG_H; iy++) {
-    outer: for (var sy = iy * SAND_SUBDIV; sy < (iy + 1) * SAND_SUBDIV; sy++) {
+  // Find the highest row (smallest Y) that contains at least one grain.
+  var topRow = IMG_H - 1;
+  outer: for (var iy = 0; iy < IMG_H; iy++) {
+    for (var sy = iy * SAND_SUBDIV; sy < (iy + 1) * SAND_SUBDIV; sy++) {
       for (var sx = 0; sx < SAND_W; sx++) {
-        if (sandGrid[sy * SAND_W + sx] >= 0) { valid.push(iy); break outer; }
+        if (sandGrid[sy * SAND_W + sx] >= 0) { topRow = iy; break outer; }
       }
     }
   }
-  if (valid.length === 0) return (IMG_H / 2) | 0;
-  return valid[(Math.random() * valid.length) | 0];
+  // Random row in [topRow, IMG_H - 1]
+  var bottomRow = IMG_H - 1;
+  return topRow + ((Math.random() * (bottomRow - topRow + 1)) | 0);
 }
 
 // ============================================================
