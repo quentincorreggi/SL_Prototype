@@ -14,6 +14,7 @@ function initGame(levelData) {
   computeLayout();
   initBelt();
   jumpers = [];
+  conveyorClearCount = 0;
   particles = [];
   attractionTrails = [];
   rejectShake = { idx: -1, t: 0 };
@@ -55,8 +56,41 @@ function initGame(levelData) {
     }
   }
 
+  // Spawn conveyor blocks onto the belt from level data.
+  if (lvl.beltItems) {
+    for (var bi = 0; bi < lvl.beltItems.length && bi < BELT_SLOTS; bi++) {
+      var item = lvl.beltItems[bi];
+      if (item.type === 'conveyor') {
+        beltSlots[bi] = {
+          type: 'conveyor',
+          ci: item.ci | 0,
+          fill: 0,
+          capacity: 0,
+          pullCooldown: ATTRACT_PULL_FRAMES,
+          done: false,
+          popT: 0,
+          bornAt: 0,
+          revealT: null,
+          locked: true,
+          threshold: item.threshold || 1,
+          clearsRemaining: item.threshold || 1,
+          unlockT: null
+        };
+      }
+    }
+  }
+
   // Capacities are derived from sand and buckets together; computed once.
   computeLevelCapacities();
+
+  // Set capacity on conveyor blocks now that capacities are computed.
+  for (var s = 0; s < BELT_SLOTS; s++) {
+    var cb = beltSlots[s];
+    if (cb && cb.type === 'conveyor') {
+      cb.capacity = levelCapacities[cb.ci] || 0;
+    }
+  }
+
   updateTunnels();
   updateBucketActivation();
   showQuitBtn();
@@ -77,6 +111,11 @@ function computeLevelCapacities() {
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bktPer[cell.contents[k].ci]++;
     }
+  }
+  // Count conveyor blocks on belt toward bucket totals.
+  for (var bs = 0; bs < BELT_SLOTS; bs++) {
+    var bb = beltSlots[bs];
+    if (bb && !bb.reserved && bb.type === 'conveyor') bktPer[bb.ci]++;
   }
   for (var ci = 0; ci < NUM_COLORS; ci++) {
     levelCapacities[ci] = (bktPer[ci] > 0 && sandPer[ci] > 0)
@@ -322,7 +361,30 @@ function updateColorDepletion() {
   for (var s = 0; s < BELT_SLOTS; s++) {
     var b = beltSlots[s];
     if (!b || b.reserved || b.done) continue;
+    if (b.locked) continue;
     if (!hasSand[b.ci]) b.done = true;
+  }
+}
+
+var conveyorClearCount = 0;
+
+function onBucketCleared(bucket) {
+  if (bucket.type === 'conveyor') return;
+  conveyorClearCount++;
+  for (var s = 0; s < BELT_SLOTS; s++) {
+    var b = beltSlots[s];
+    if (!b || b.reserved || !b.locked || b.type !== 'conveyor') continue;
+    b.clearsRemaining--;
+    if (b.clearsRemaining <= 0) {
+      b.clearsRemaining = 0;
+      b.locked = false;
+      b.unlockT = 0;
+      if (typeof sfx !== 'undefined') sfx.pop();
+      if (typeof spawnBurst === 'function') {
+        var pos = getBeltSlotPos(s);
+        spawnBurst(pos.x, pos.y, '#FFD700', 12);
+      }
+    }
   }
 }
 

@@ -158,28 +158,21 @@ function drawBeltBucket(s, b) {
   } else {
     ctx.save();
   }
-  // Reveal-cross-fade for hidden type
-  var displayCi = b.ci;
-  var revealAlpha = 1;
-  if (b.type === 'hidden' && b.revealT != null && b.revealT < 12) {
-    revealAlpha = b.revealT / 12;
-  }
-  var type = getBucketType(b.type === 'hidden' && revealAlpha < 1 ? 'hidden' : 'default');
-  // Draw "in-between" reveal: under-cap hidden, over-cap default fading in
-  if (b.type === 'hidden' && b.revealT != null && b.revealT < 12) {
+  var w = size * scale, h = size * scale;
+  var x = pos.x - w / 2, y = pos.y - h / 2;
+
+  if (b.type === 'conveyor' && typeof drawConveyorBeltBucket === 'function') {
+    drawConveyorBeltBucket(ctx, x, y, w, h, b, S, tick);
+  } else if (b.type === 'hidden' && b.revealT != null && b.revealT < 12) {
+    var revealAlpha = b.revealT / 12;
     var hidden = getBucketType('hidden');
-    var defType = getBucketType('default');
-    var w = size * scale, h = size * scale;
-    var x = pos.x - w / 2, y = pos.y - h / 2;
     ctx.globalAlpha = 1 - revealAlpha;
-    hidden.drawActive(ctx, x, y, w, h, displayCi, S, tick, 0);
+    hidden.drawActive(ctx, x, y, w, h, b.ci, S, tick, 0);
     ctx.globalAlpha = revealAlpha;
-    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, b.capacity || 0);
+    drawJar(ctx, x, y, w, h, b.ci, S, b.fill || 0, b.capacity || 0);
     ctx.globalAlpha = 1;
   } else {
-    var w = size * scale, h = size * scale;
-    var x = pos.x - w / 2, y = pos.y - h / 2;
-    drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, b.capacity || 0);
+    drawJar(ctx, x, y, w, h, b.ci, S, b.fill || 0, b.capacity || 0);
   }
   ctx.restore();
 }

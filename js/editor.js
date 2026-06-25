@@ -20,7 +20,8 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(IMG_W * IMG_H)
+  sandImage: new Array(IMG_W * IMG_H),
+  beltItems: []
 };
 
 // --- Bucket-grid state ---
@@ -53,10 +54,12 @@ var ED_HISTORY_LIMIT = 80;
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.beltItems = [];
   edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
   edBuildGrid();
+  edBuildBeltItems();
   edBindSandPointer();
   edRefreshLiveSections();
   edHideTunnelPanel();
@@ -74,7 +77,10 @@ function edSnapshotState() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    beltItems: (edLevel.beltItems || []).map(function (b) {
+      return { type: b.type, ci: b.ci, threshold: b.threshold };
+    })
   };
 }
 
@@ -95,8 +101,9 @@ function edRestoreState(s) {
   edLevel.desc = s.desc;
   edLevel.grid = s.grid.map(cloneCellForLevel);
   edLevel.sandImage = s.sandImage.slice();
-  // Cancel any in-progress drag so a subsequent move event won't restore
-  // the pre-drag snapshot over the just-restored state.
+  edLevel.beltItems = (s.beltItems || []).map(function (b) {
+    return { type: b.type, ci: b.ci, threshold: b.threshold };
+  });
   edDragging = false;
   edDragMode = null;
   edDragStart = null;
@@ -107,6 +114,7 @@ function edRestoreState(s) {
   edRefreshSandGrid();
   edBuildGrid();
   edBuildToolbar();
+  edBuildBeltItems();
   edSelectedTunnel = -1;
   edHideTunnelPanel();
   edRefreshLiveSections();
@@ -164,6 +172,10 @@ function edComputeCounts() {
     else if (cell.kind === 'tunnel' && cell.contents) {
       for (var k = 0; k < cell.contents.length; k++) bkt[cell.contents[k].ci]++;
     }
+  }
+  var items = edLevel.beltItems || [];
+  for (var bi = 0; bi < items.length; bi++) {
+    bkt[items[bi].ci]++;
   }
   return { sand: sand, bkt: bkt };
 }
@@ -552,7 +564,8 @@ function drawEllipseShape(x0, y0, x1, y1, ci) {
 }
 
 function edOnSandChanged() {
-  edBuildToolbar();      // available bucket colors may have changed
+  edBuildToolbar();
+  edBuildBeltItems();
   edRefreshLiveSections();
 }
 
@@ -794,8 +807,10 @@ function edHideTunnelPanel() {
 function edClearAll() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.beltItems = [];
   edHideTunnelPanel();
   edBuildGrid();
+  edBuildBeltItems();
   edRefreshSandGrid();
   edBuildToolbar();
   edRefreshLiveSections();
@@ -973,7 +988,10 @@ function editorTestPlay() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    beltItems: (edLevel.beltItems || []).map(function (b) {
+      return { type: b.type, ci: b.ci, threshold: b.threshold };
+    })
   });
 }
 
@@ -998,7 +1016,8 @@ function editorExportJSON() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid,
-    sandImage: Array.from(edLevel.sandImage || [])
+    sandImage: Array.from(edLevel.sandImage || []),
+    beltItems: edLevel.beltItems || []
   });
   ta.select();
   edToast('Exported — select + copy.');
@@ -1022,17 +1041,157 @@ function editorImportJSON() {
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
     edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
     while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
+    edLevel.beltItems = (data.beltItems || []).map(function (b) {
+      return { type: b.type || 'conveyor', ci: b.ci | 0, threshold: b.threshold || 1 };
+    });
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();
     edBuildGrid();
     edBuildToolbar();
+    edBuildBeltItems();
     edRefreshLiveSections();
     ta.style.display = 'none';
     edToast('Imported.');
     edPushHistory();
   } catch (e) {
     edToast('Invalid JSON.');
+  }
+}
+
+// ============================================================
+// Belt Items panel (conveyor blocks)
+// ============================================================
+
+function edBuildBeltItems() {
+  var panel = document.getElementById('ed-belt-items');
+  if (!panel) return;
+  panel.innerHTML = '';
+  var items = edLevel.beltItems || [];
+
+  var title = document.createElement('div');
+  title.className = 'ed-belt-section-title';
+  title.innerHTML = '<span>⛓</span> Belt Items';
+  panel.appendChild(title);
+
+  for (var i = 0; i < items.length; i++) {
+    (function (idx) {
+      var item = items[idx];
+      var c = COLORS[item.ci];
+      var row = document.createElement('div');
+      row.className = 'ed-belt-item';
+
+      var dot = document.createElement('span');
+      dot.className = 'ed-belt-item-dot';
+      dot.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+      row.appendChild(dot);
+
+      var info = document.createElement('span');
+      info.className = 'ed-belt-item-info';
+      info.textContent = CLR_NAMES[item.ci] + ' · unlock after';
+      row.appendChild(info);
+
+      var inp = document.createElement('input');
+      inp.type = 'number';
+      inp.className = 'ed-belt-item-threshold';
+      inp.min = '1';
+      inp.max = '20';
+      inp.value = item.threshold;
+      inp.onchange = function () {
+        var v = parseInt(inp.value, 10);
+        if (isNaN(v) || v < 1) v = 1;
+        if (v > 20) v = 20;
+        item.threshold = v;
+        inp.value = v;
+        edBuildBeltItems();
+        edRefreshLiveSections();
+        edPushHistory();
+      };
+      row.appendChild(inp);
+
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:11px;color:#5A4A38';
+      lbl.textContent = 'clears';
+      row.appendChild(lbl);
+
+      var rm = document.createElement('button');
+      rm.className = 'ed-belt-item-rm';
+      rm.textContent = '✕';
+      rm.title = 'Remove';
+      rm.onclick = function () {
+        items.splice(idx, 1);
+        edBuildBeltItems();
+        edRefreshLiveSections();
+        edPushHistory();
+      };
+      row.appendChild(rm);
+
+      panel.appendChild(row);
+    })(i);
+  }
+
+  // Warnings
+  var totalGridBuckets = 0;
+  for (var gi = 0; gi < edLevel.grid.length; gi++) {
+    var cell = edLevel.grid[gi];
+    if (!cell) continue;
+    if (cell.kind === 'bucket') totalGridBuckets++;
+    if (cell.kind === 'tunnel' && cell.contents) totalGridBuckets += cell.contents.length;
+  }
+  var warnings = [];
+  if (items.length > BELT_SLOTS) {
+    warnings.push('Too many belt items (' + items.length + '/' + BELT_SLOTS + ' slots).');
+  }
+  for (var wi = 0; wi < items.length; wi++) {
+    if (items[wi].threshold >= totalGridBuckets) {
+      warnings.push('Block #' + (wi + 1) + ': threshold ' + items[wi].threshold +
+        ' ≥ clearable buckets (' + totalGridBuckets + ').');
+    }
+  }
+  for (var ww = 0; ww < warnings.length; ww++) {
+    var warn = document.createElement('div');
+    warn.className = 'ed-belt-warn';
+    warn.textContent = '⚠ ' + warnings[ww];
+    panel.appendChild(warn);
+  }
+
+  // Add button
+  if (items.length < BELT_SLOTS) {
+    var addDiv = document.createElement('div');
+    addDiv.className = 'ed-belt-add';
+    var addLabel = document.createElement('div');
+    addLabel.className = 'ed-belt-add-label';
+    addLabel.textContent = '+ Add conveyor block:';
+    addDiv.appendChild(addLabel);
+
+    var avail = edAvailableColors();
+    if (avail.length === 0) {
+      var msg = document.createElement('div');
+      msg.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic';
+      msg.textContent = 'Paint sand first to unlock colors.';
+      addDiv.appendChild(msg);
+    } else {
+      var clrRow = document.createElement('div');
+      clrRow.className = 'ed-belt-add-colors';
+      avail.forEach(function (ci) {
+        var c = COLORS[ci];
+        var btn = document.createElement('button');
+        btn.className = 'ed-belt-add-clr';
+        btn.style.background = 'linear-gradient(135deg,' + c.light + ',' + c.dark + ')';
+        btn.title = CLR_NAMES[ci];
+        btn.textContent = '+';
+        btn.onclick = function () {
+          if (!edLevel.beltItems) edLevel.beltItems = [];
+          edLevel.beltItems.push({ type: 'conveyor', ci: ci, threshold: 3 });
+          edBuildBeltItems();
+          edRefreshLiveSections();
+          edPushHistory();
+        };
+        clrRow.appendChild(btn);
+      });
+      addDiv.appendChild(clrRow);
+    }
+    panel.appendChild(addDiv);
   }
 }
 
