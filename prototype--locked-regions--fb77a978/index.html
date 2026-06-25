@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sand Loop — Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#EDE5D8;
+    font-family:'Fredoka',sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+  canvas{display:block}
+
+  /* === Win screen === */
+  #win-screen{position:absolute;inset:0;z-index:100;background:rgba(180,165,145,0.92);
+    display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+  #win-screen.show{display:flex}
+  #win-screen h1{font-size:48px;color:#8B6914;text-shadow:0 0 30px rgba(139,105,20,0.5),0 4px 0 #6B5010}
+  #win-screen p{color:#5A4A38;font-size:18px}
+  #win-screen button{padding:14px 40px;border-radius:30px;border:none;
+    background:linear-gradient(135deg,#4EE68C,#36C76E);color:white;font-size:20px;
+    font-weight:700;font-family:'Fredoka',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(78,230,140,0.4)}
+
+  /* === Level select === */
+  #level-screen{position:absolute;inset:0;z-index:90;
+    background:linear-gradient(170deg,#EDE5D8 0%,#E0D4C0 40%,#D4C4AA 100%);
+    display:flex;flex-direction:column;align-items:center;overflow-y:auto}
+  #level-screen.hidden{display:none}
+  .ls-header{width:100%;text-align:center;padding:32px 20px 16px}
+  .ls-title{font-size:38px;font-weight:700;color:#8B6914;text-shadow:0 3px 0 #C4A84D;margin-bottom:4px}
+  .ls-sub{font-size:15px;color:#9C8A70}
+  .ls-actions{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 24px 30px;width:100%}
+  .ls-editor-btn{padding:14px 32px;border:none;border-radius:16px;cursor:pointer;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:white;
+    background:linear-gradient(135deg,#C89CF2,#9060C4);box-shadow:0 6px 22px rgba(144,96,196,0.35);
+    transition:transform 0.18s;display:flex;align-items:center;gap:10px}
+  .ls-editor-btn:hover{transform:scale(1.06)}.ls-editor-btn:active{transform:scale(0.94)}
+  .ls-play-btn{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 6px 22px rgba(78,230,140,0.35)}
+
+  /* === Calibration === */
+  #cal-toggle{position:absolute;top:10px;right:10px;z-index:30;width:40px;height:40px;border-radius:12px;border:none;
+    background:rgba(160,130,100,0.8);color:white;font-size:20px;cursor:pointer;font-family:'Fredoka',sans-serif}
+  #cal-panel{display:none;position:absolute;top:55px;right:10px;z-index:30;
+    background:rgba(240,230,218,0.95);border-radius:14px;padding:12px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.2);width:260px;max-height:80vh;overflow-y:auto;font-family:'Fredoka',sans-serif}
+  #cal-panel h3{font-size:11px;color:#8B6914;margin:8px 0 4px;text-transform:uppercase;letter-spacing:1px}
+  #cal-panel p{font-size:11px;color:#5A4A38}
+  .cal-row{margin:8px 0;display:flex;flex-direction:column;gap:3px}
+  .cal-row label{font-size:12px;color:#5A4A38;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .cal-row label .v{background:rgba(123,82,160,0.18);color:#7B52A0;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:700}
+  .cal-row input[type=range]{width:100%;accent-color:#7B52A0}
+  .cal-row .hint{font-size:10px;color:#9C8A70;font-style:italic}
+
+  /* === Quit button (visible during gameplay only) === */
+  #quit-btn{display:none;position:absolute;top:10px;left:10px;z-index:30;
+    align-items:center;gap:6px;padding:0 14px;height:40px;border-radius:12px;border:none;
+    background:rgba(160,130,100,0.8);color:white;font-size:14px;font-weight:700;cursor:pointer;
+    font-family:'Fredoka',sans-serif;box-shadow:0 3px 12px rgba(0,0,0,0.15)}
+  #quit-btn:hover{background:rgba(180,140,110,0.9);transform:scale(1.04)}
+  #quit-btn:active{transform:scale(0.95)}
+
+  /* ============================================================
+     EDITOR — full-screen, two-pane layout
+     ============================================================ */
+  #editor-screen{position:absolute;inset:0;z-index:95;display:flex;flex-direction:column;
+    background:linear-gradient(170deg,#E8E0D4 0%,#DDD2C0 40%,#D0C2AA 100%);
+    overflow:hidden;touch-action:auto;user-select:auto;-webkit-user-select:auto}
+  #editor-screen.hidden{display:none}
+  #editor-screen input,#editor-screen textarea{user-select:text;-webkit-user-select:text;touch-action:auto}
+
+  .ed-top{display:flex;align-items:center;gap:10px;padding:10px 14px;
+    background:rgba(255,255,255,0.55);border-bottom:1px solid rgba(120,100,80,0.25);
+    flex-shrink:0;flex-wrap:wrap}
+  .ed-back{background:rgba(160,130,100,0.7);border:none;border-radius:10px;width:34px;height:34px;
+    color:white;font-size:18px;cursor:pointer;font-family:'Fredoka',sans-serif;flex-shrink:0}
+  .ed-back:active{transform:scale(0.92)}
+  .ed-top-title{font-size:18px;font-weight:700;color:#7B52A0;flex-shrink:0;margin-right:6px}
+  .ed-top input{padding:7px 10px;border:1.5px solid rgba(160,140,120,0.3);border-radius:8px;
+    background:rgba(255,255,255,0.85);font-family:'Fredoka',sans-serif;font-size:13px;color:#5A4A38;outline:none;
+    min-width:140px;flex:1;max-width:240px}
+  .ed-top input:focus{border-color:rgba(123,82,160,0.5)}
+  .ed-top-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  .ed-top-actions .ed-action{padding:8px 16px;font-size:13px;border-radius:10px}
+
+  .ed-main{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;
+    overflow:hidden;min-height:0}
+  .ed-pane{background:rgba(255,255,255,0.50);border-radius:14px;border:1px solid rgba(180,165,145,0.3);
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-direction:column;min-width:0;min-height:0;
+    overflow:hidden}
+  .ed-pane-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
+    padding:10px 14px 6px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+
+  /* Left pane: tool sidebar + sand canvas */
+  .ed-left-body{flex:1;display:flex;gap:10px;padding:0 12px 12px;min-height:0;min-width:0}
+  #ed-tool-sidebar{display:flex;flex-direction:column;gap:6px;width:96px;flex-shrink:0;
+    background:rgba(255,255,255,0.55);border-radius:10px;border:1px solid rgba(160,140,120,0.25);
+    padding:8px;overflow-y:auto;max-height:100%}
+  .ed-tool-section-label{font-size:9px;font-weight:700;color:#8B6914;text-transform:uppercase;
+    letter-spacing:0.8px;text-align:center;margin:6px 0 2px;flex-shrink:0}
+  .ed-tool-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;
+    border:2px solid rgba(120,100,80,0.20);background:rgba(255,255,255,0.55);
+    cursor:pointer;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;color:#5A4A38;
+    transition:transform 0.12s,border-color 0.15s,background 0.15s;flex-shrink:0}
+  .ed-tool-btn:hover{transform:translateX(2px);background:rgba(255,255,255,0.85)}
+  .ed-tool-btn.active{background:rgba(123,82,160,0.18);border-color:rgba(123,82,160,0.55);color:#7B52A0}
+  .ed-tool-icon{font-size:14px;width:16px;display:inline-flex;justify-content:center}
+  .ed-size-row{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;flex-shrink:0}
+  .ed-size-btn{aspect-ratio:1;border:2px solid rgba(120,100,80,0.20);border-radius:6px;
+    background:rgba(255,255,255,0.6);cursor:pointer;display:flex;align-items:center;justify-content:center;
+    font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;color:#5A4A38;
+    transition:transform 0.12s,border-color 0.15s}
+  .ed-size-btn:hover{transform:scale(1.05)}
+  .ed-size-btn.active{border-color:rgba(90,60,30,0.85);background:rgba(255,255,255,0.95);
+    box-shadow:0 0 0 2px rgba(139,105,20,0.30)}
+  .ed-size-dot{background:#5A4A38;border-radius:50%}
+  .ed-color-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;flex-shrink:0}
+  .ed-color-grid .ed-tool{width:auto;aspect-ratio:1;height:auto}
+
+  .ed-sand-area{flex:1;display:flex;align-items:center;justify-content:center;
+    min-width:0;min-height:0;overflow:hidden}
+  #ed-sand-grid{display:grid;grid-template-columns:repeat(32,1fr);gap:0;
+    width:100%;max-width:100%;max-height:100%;aspect-ratio:1;
+    background:rgba(120,100,80,0.30);padding:2px;border-radius:8px;
+    user-select:none;-webkit-user-select:none;touch-action:none;cursor:crosshair}
+  .ed-sand-px{aspect-ratio:1;background:#F4ECDB;-webkit-tap-highlight-color:transparent;
+    pointer-events:none;border:0.5px solid rgba(120,100,80,0.08)}
+
+  /* Right pane: capacities, toolbar, grid, tunnel panel */
+  .ed-right-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 14px 14px;
+    overflow-y:auto;min-height:0}
+  #ed-capacities{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+  .ed-cap-chip{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;
+    background:rgba(255,255,255,0.6);border:1px solid rgba(160,140,120,0.3);font-size:12px;color:#5A4A38}
+  .ed-cap-chip.warn{background:rgba(220,90,90,0.12);border-color:rgba(220,90,90,0.4);color:#A53030}
+  .ed-cap-chip.dim{opacity:0.7;font-style:italic}
+  .ed-cap-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.2)}
+  .ed-cap-info{flex:1;font-weight:600}
+
+  #ed-toolbar{display:flex;flex-direction:column;gap:6px;align-items:stretch;flex-shrink:0}
+  .ed-type-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+  .ed-color-row{display:flex;flex-direction:row;gap:4px;flex-wrap:nowrap;overflow-x:auto;
+    justify-content:flex-start;padding:4px 2px;
+    -webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .ed-color-row::-webkit-scrollbar{height:5px}
+  .ed-color-row::-webkit-scrollbar-thumb{background:rgba(160,140,120,0.45);border-radius:3px}
+  .ed-type-btn{padding:5px 12px;border:2px solid rgba(120,100,80,0.2);border-radius:8px;
+    font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;cursor:pointer;
+    color:#5A4A38;background:rgba(180,165,145,0.25);transition:all 0.15s}
+  .ed-type-btn.active{background:rgba(123,82,160,0.2);border-color:rgba(123,82,160,0.5);color:#7B52A0}
+  .ed-type-btn:hover{transform:scale(1.05)}
+  .ed-tool{width:30px;height:30px;flex-shrink:0;border:2px solid rgba(120,100,80,0.30);border-radius:7px;
+    color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
+    cursor:pointer;transition:transform 0.12s,border-color 0.15s,box-shadow 0.15s;
+    display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px rgba(0,0,0,0.3);
+    padding:0}
+  .ed-tool:hover{transform:scale(1.10)}.ed-tool:active{transform:scale(0.9)}
+  .ed-tool.active{border-color:rgba(90,60,30,0.85);box-shadow:0 0 0 2px rgba(139,105,20,0.35),0 2px 8px rgba(0,0,0,0.15)}
+
+  .ed-grid-area{flex-shrink:0;display:flex;justify-content:center}
+  #ed-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;width:100%;max-width:340px}
+  .ed-cell{aspect-ratio:1;border-radius:6px;cursor:pointer;border:2px solid rgba(160,140,120,0.3);
+    display:flex;align-items:center;justify-content:center;transition:transform 0.12s;
+    -webkit-tap-highlight-color:transparent;position:relative}
+  .ed-cell:hover{transform:scale(1.06);z-index:1}.ed-cell:active{transform:scale(0.92)}
+  .ed-cell-dot{font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);text-shadow:0 1px 2px rgba(0,0,0,0.3);pointer-events:none}
+  .ed-tunnel-badge{position:absolute;top:-3px;right:-3px;background:#FFB545;color:#fff;
+    font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;pointer-events:none;border:1.5px solid #fff}
+
+  #ed-tunnel-panel{display:none;background:rgba(61,53,72,0.10);border-radius:12px;padding:10px 12px;
+    border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
+  .ed-section-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
+    margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .ed-section-title .icon{font-size:15px}
+  .ed-tunnel-dir-row{display:flex;gap:5px;justify-content:center;margin-bottom:6px}
+  .ed-tunnel-dir-btn{padding:5px 14px;border:2px solid rgba(106,96,112,0.3);border-radius:8px;
+    font-family:'Fredoka',sans-serif;font-size:12px;font-weight:600;cursor:pointer;
+    color:#5A4A38;background:rgba(180,165,145,0.25);transition:all 0.15s}
+  .ed-tunnel-dir-btn.active{background:rgba(255,190,80,0.25);border-color:rgba(255,190,80,0.6);color:#B87A20}
+  .ed-tunnel-contents{display:flex;flex-wrap:wrap;gap:4px;min-height:32px;padding:6px;
+    background:rgba(0,0,0,0.04);border-radius:8px;margin-bottom:6px}
+  .ed-tunnel-item{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
+    border:2px solid rgba(255,255,255,0.3);transition:transform 0.12s;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
+  .ed-tunnel-item:hover{transform:scale(1.15);border-color:rgba(255,80,80,0.6)}
+  .ed-tunnel-add-colors{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-bottom:4px}
+  .ed-tunnel-add-clr{width:28px;height:28px;border:2px solid rgba(255,255,255,0.3);border-radius:6px;
+    color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
+    cursor:pointer;transition:transform 0.12s;text-shadow:0 1px 2px rgba(0,0,0,0.2);
+    display:flex;align-items:center;justify-content:center}
+  .ed-tunnel-add-clr:hover{transform:scale(1.15)}
+
+  .ed-quick{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;flex-shrink:0}
+  .ed-qbtn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
+    cursor:pointer;color:#5A4A38;background:rgba(180,165,145,0.35);transition:transform 0.12s}
+  .ed-qbtn:hover{background:rgba(180,165,145,0.55);transform:scale(1.05)}
+  .ed-presets{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center;flex-shrink:0;font-size:11px;color:#5A4A38}
+  .ed-presets-label{font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:0.8px;font-size:10px;margin-right:2px}
+  .ed-preset-btn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
+    cursor:pointer;color:#fff;background:linear-gradient(135deg,#C89CF2,#9060C4);
+    box-shadow:0 2px 6px rgba(144,96,196,0.25);transition:transform 0.12s}
+  .ed-preset-btn:hover{transform:scale(1.06)}
+
+  .ed-action{padding:10px 18px;border:none;border-radius:12px;font-family:'Fredoka',sans-serif;font-size:13px;font-weight:700;
+    cursor:pointer;color:white;transition:transform 0.15s}
+  .ed-action:hover{transform:scale(1.05)}.ed-action:active{transform:scale(0.93)}
+  .ed-action.play{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 3px 12px rgba(78,230,140,0.35)}
+  .ed-action.export{background:linear-gradient(135deg,#89CFF0,#5BA3D9);box-shadow:0 3px 12px rgba(91,163,217,0.3)}
+  .ed-action.import{background:linear-gradient(135deg,#E8A84C,#D4903A);box-shadow:0 3px 12px rgba(232,168,76,0.3)}
+  .ed-action.disabled,.ed-action[disabled]{opacity:0.45;cursor:not-allowed;pointer-events:none}
+
+  #ed-export-area{display:none;position:absolute;bottom:12px;left:12px;right:12px;
+    height:120px;padding:8px;border:1.5px solid rgba(160,140,120,0.4);border-radius:8px;
+    background:rgba(255,255,255,0.95);font-family:monospace;font-size:11px;color:#5A4A38;
+    resize:vertical;outline:none;z-index:6}
+  #ed-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:rgba(90,74,56,0.92);color:white;padding:10px 24px;border-radius:12px;
+    font-size:13px;font-weight:600;pointer-events:none;z-index:200;opacity:0;
+    transition:transform 0.35s cubic-bezier(.34,1.56,.64,1),opacity 0.3s}
+  #ed-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* Narrow screens: stack panes vertically */
+  @media (max-width: 760px) {
+    .ed-main{grid-template-columns:1fr;grid-template-rows:auto auto;overflow-y:auto}
+    .ed-pane{min-height:auto}
+    #ed-tool-sidebar{width:80px}
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<button id="quit-btn" onclick="quitGame()">&#10005; Quit</button>
+
+<button id="cal-toggle">&#9881;</button>
+<div id="cal-panel">
+  <h3>Debug</h3>
+  <div class="cal-row">
+    <label>Belt speed <span class="v" id="cal-belt-speed-v">7</span></label>
+    <input id="cal-belt-speed" type="range" min="0" max="100" step="1" value="7">
+    <div class="hint">Conveyor scroll speed (0 = paused). 7&nbsp;≈ one slot every 2.4&nbsp;s at 60&nbsp;fps.</div>
+  </div>
+  <div class="cal-row">
+    <label>Bucket radius <span class="v" id="cal-radius-v">2</span></label>
+    <input id="cal-radius" type="range" min="1" max="20" step="1" value="2">
+    <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
+  </div>
+  <div class="cal-row">
+    <label>Pull interval <span class="v" id="cal-pull-v">1</span></label>
+    <input id="cal-pull" type="range" min="1" max="40" step="1" value="1">
+    <div class="hint">Frames between pull cycles. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
+  </div>
+  <div class="cal-row">
+    <label>Grains per cycle <span class="v" id="cal-batch-v">12</span></label>
+    <input id="cal-batch" type="range" min="1" max="20" step="1" value="12">
+    <div class="hint">How many grains the bucket pulls each cycle (nearest first, capped by remaining capacity).</div>
+  </div>
+  <div class="cal-row">
+    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">3&times;3</span></label>
+    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="3">
+    <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
+  </div>
+  <div class="cal-row">
+    <label>Sand CA interval <span class="v" id="cal-sandint-v">2</span></label>
+    <input id="cal-sandint" type="range" min="1" max="10" step="1" value="2">
+    <div class="hint">How often the falling-sand physics ticks (in render frames). 1&nbsp;=&nbsp;every frame (snappiest), higher&nbsp;=&nbsp;slower, heavier feel.</div>
+  </div>
+</div>
+
+<div id="level-screen">
+  <div class="ls-header">
+    <div class="ls-title">Sand Loop</div>
+    <div class="ls-sub">Tap an active bucket &middot; it rides the belt and pulls matching sand</div>
+  </div>
+  <div class="ls-actions">
+    <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
+    <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
+  </div>
+</div>
+
+<div id="editor-screen" class="hidden">
+  <div class="ed-top">
+    <button class="ed-back" onclick="editorBack()">&#8592;</button>
+    <div class="ed-top-title">Level Editor</div>
+    <input id="ed-name" type="text" value="Custom Level" maxlength="40" oninput="editorSetName(this.value)" placeholder="Name">
+    <input id="ed-desc" type="text" value="My custom level" maxlength="60" oninput="editorSetDesc(this.value)" placeholder="Description">
+    <div class="ed-top-actions">
+      <button id="ed-test-play" class="ed-action play" onclick="editorTestPlay()">&#9654; Test Play</button>
+      <button class="ed-action export" onclick="editorExportJSON()">&#128203; Export</button>
+      <button class="ed-action import" onclick="editorImportJSON()">&#128229; Import</button>
+    </div>
+  </div>
+
+  <div class="ed-main">
+    <div class="ed-pane ed-left">
+      <div class="ed-pane-title"><span>&#127912;</span> Sand Image (32&times;32)</div>
+      <div class="ed-left-body">
+        <div id="ed-tool-sidebar"></div>
+        <div class="ed-sand-area">
+          <div id="ed-sand-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ed-pane ed-right">
+      <div class="ed-pane-title"><span>&#128230;</span> Bucket Grid (7&times;7)</div>
+      <div class="ed-right-body">
+        <div id="ed-capacities"></div>
+        <div id="ed-toolbar"></div>
+        <div class="ed-grid-area"><div id="ed-grid"></div></div>
+        <div class="ed-quick">
+          <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
+          <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
+        </div>
+        <div class="ed-presets">
+          <span class="ed-presets-label">Presets</span>
+          <button class="ed-preset-btn" onclick="edLoadPreset(0)">4 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(1)">5 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(2)">6 colors</button>
+          <button class="ed-preset-btn" onclick="edLoadPreset(3)">7 colors</button>
+        </div>
+        <input type="file" id="ed-png-input" accept="image/png" style="display:none" onchange="edImportPNG(event)">
+        <div id="ed-tunnel-panel"></div>
+      </div>
+    </div>
+  </div>
+
+  <textarea id="ed-export-area"></textarea>
+</div>
+
+<div id="win-screen">
+  <h1>You Win!</h1>
+  <p id="win-msg">All sand collected!</p>
+  <button onclick="showLevelSelect()">Back</button>
+</div>
+<div id="ed-toast"></div>
+
+<script>
+  function startDemo() {
+    var ls = document.getElementById('level-screen');
+    var ed = document.getElementById('editor-screen');
+    if (ls) ls.classList.add('hidden');
+    if (ed) ed.classList.add('hidden');
+    if (typeof initGame === 'function') initGame();
+    if (typeof ensureAudio === 'function') ensureAudio();
+  }
+</script>
+
+<!-- Scripts: order matters -->
+<script src="js/config.js"></script>
+<script src="js/registry.js"></script>
+<script src="js/bucket_default.js"></script>
+<script src="js/bucket_hidden.js"></script>
+<script src="js/bucket_star.js"></script>
+<script src="js/calibration.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/belt.js"></script>
+<script src="js/sand.js"></script>
+<script src="js/bucket_attraction.js"></script>
+<script src="js/tunnel.js"></script>
+<script src="js/wall.js"></script>
+<script src="js/locked_region.js"></script>
+<script src="js/rendering.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
