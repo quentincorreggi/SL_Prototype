@@ -44,6 +44,9 @@ function drawFrame() {
   drawJumpers();
   drawTrails();
   if (typeof drawParticles === 'function') drawParticles();
+  if (typeof drawRocketButton === 'function') drawRocketButton();
+  if (typeof drawRocketProjectile === 'function') drawRocketProjectile();
+  if (typeof drawRocketShockwave === 'function') drawRocketShockwave();
 }
 
 function drawBackground() {

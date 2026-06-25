@@ -212,6 +212,11 @@ function tunnelTargetIndex(idx, dir) {
 function handleTap(sx, sy) {
   if (won || !gameActive) return;
   if (!L.grid) return;
+  // Rocket booster button
+  if (typeof isRocketButtonTap === 'function' && isRocketButtonTap(sx, sy)) {
+    fireRocket();
+    return;
+  }
   // Hit-test the grid.
   var cs = L.grid.cell;
   if (sx < L.grid.x || sx > L.grid.x + L.grid.w) return;
@@ -300,6 +305,7 @@ function update() {
   updateAttractionTrails();
   updateColorDepletion();
   if (typeof tickParticles === 'function') tickParticles();
+  if (typeof updateRocket === 'function') { updateRocket(); updateRocketShockwave(); }
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
   if (updateTunnels()) updateBucketActivation();
