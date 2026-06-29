@@ -37,21 +37,26 @@ function rRect(x, y, w, h, r) {
 
 function drawFrame() {
   ctx.clearRect(0, 0, W, H);
+  drawBackground();
 
-  // Gravity orb flip animation: rotate the whole canvas 0→180° over 2 s.
-  // The sandGrid is flipped at the 90° midpoint (edge-on, invisible).
-  // After the animation, the transform is removed and play continues normally.
+  // Gravity orb flip animation: rotate only the game content (sand + belt + grid)
+  // around the centre of the play area. The background frame stays still.
+  // The sandGrid is flipped at the 90° midpoint when the view is edge-on.
   var doFlipAnim = (typeof gravityFlipAnim !== 'undefined') && gravityFlipAnim.active;
   if (doFlipAnim) {
     var p = gravityFlipAnim.t / gravityFlipAnim.dur;
     var angle = Math.PI * p;
+    // Centre of the game area (midpoint between top of sand image and bottom of grid)
+    var cx = W / 2;
+    var cy = L.image && L.grid
+      ? (L.image.y + L.grid.y + L.grid.h) / 2
+      : H / 2;
     ctx.save();
-    ctx.translate(W / 2, H / 2);
+    ctx.translate(cx, cy);
     ctx.rotate(angle);
-    ctx.translate(-W / 2, -H / 2);
+    ctx.translate(-cx, -cy);
   }
 
-  drawBackground();
   drawSandImage();
   drawBelt();
   drawGrid();
