@@ -572,6 +572,7 @@ function edBuildToolbar() {
     { id: 'hidden',  label: 'Hidden' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
+    { id: 'gravity_orb', label: '⊛ Orb' },
     { id: 'erase',   label: 'Erase' }
   ];
   types.forEach(function (t) {
@@ -639,6 +640,12 @@ function edApplyCellStyle(el, cell) {
   el.style.background = 'rgba(180,165,145,0.25)';
   el.style.borderColor = 'rgba(160,140,120,0.3)';
   if (!cell) return;
+  if (cell.kind === 'gravity_orb') {
+    el.style.background = 'linear-gradient(135deg,#cc88ff,#440088)';
+    el.style.borderColor = '#9900ff';
+    el.innerHTML = '<span class="ed-cell-dot">⊛</span>';
+    return;
+  }
   if (cell.kind === 'wall') {
     el.style.background = 'linear-gradient(135deg,#A89B88,#7C705F)';
     el.style.borderColor = '#5A4A38';
@@ -679,6 +686,12 @@ function edPaintCell(idx, eraseOverride) {
     edLevel.grid[idx] = { kind: 'bucket', type: edTool, ci: edColor };
   } else if (edTool === 'wall') {
     edLevel.grid[idx] = { kind: 'wall' };
+  } else if (edTool === 'gravity_orb') {
+    // Only one orb allowed per level — remove any existing orb first.
+    for (var gi = 0; gi < edLevel.grid.length; gi++) {
+      if (edLevel.grid[gi] && edLevel.grid[gi].kind === 'gravity_orb') edLevel.grid[gi] = null;
+    }
+    edLevel.grid[idx] = { kind: 'gravity_orb' };
   } else if (edTool === 'tunnel') {
     var newTunnel = false;
     if (!edLevel.grid[idx] || edLevel.grid[idx].kind !== 'tunnel') {

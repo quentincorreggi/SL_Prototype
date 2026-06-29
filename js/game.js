@@ -17,6 +17,8 @@ function initGame(levelData) {
   particles = [];
   attractionTrails = [];
   rejectShake = { idx: -1, t: 0 };
+  gravityOrbCollected = false;
+  gravityFlipAnim = { active: false, t: 0, dur: 120, flipped: false };
   won = false;
   gameActive = true;
   hideWin();
@@ -87,6 +89,7 @@ function computeLevelCapacities() {
 
 function cloneCell(src) {
   if (!src) return null;
+  if (src.kind === 'gravity_orb') return { kind: 'gravity_orb' };
   if (src.kind === 'wall') return { kind: 'wall' };
   if (src.kind === 'tunnel') {
     var copy = { kind: 'tunnel', dir: src.dir || 'top', contents: [], spawned: 0 };
@@ -120,6 +123,7 @@ function isPassable(cell) {
   if (cell.kind === 'wall') return false;
   if (cell.kind === 'tunnel') return true;
   if (cell.kind === 'bucket') return cell.used;
+  if (cell.kind === 'gravity_orb') return false;
   return false;
 }
 
@@ -211,6 +215,7 @@ function tunnelTargetIndex(idx, dir) {
 
 function handleTap(sx, sy) {
   if (won || !gameActive) return;
+  if (gravityFlipAnim && gravityFlipAnim.active) return;
   if (!L.grid) return;
   // Hit-test the grid.
   var cs = L.grid.cell;
@@ -303,6 +308,8 @@ function update() {
   // Tunnels poll continuously — a queued bucket spawns the moment its
   // exit cell becomes free (e.g. after a player tap).
   if (updateTunnels()) updateBucketActivation();
+  if (typeof checkGravityOrbCollection === 'function') checkGravityOrbCollection();
+  if (typeof updateGravityOrb === 'function') updateGravityOrb();
   checkWin();
 }
 
@@ -391,23 +398,44 @@ function quitGame() {
 function demoLevel() {
   var grid = new Array(GRID_W * GRID_H);
   for (var i = 0; i < grid.length; i++) grid[i] = null;
-  // A small set of buckets on rows 4-6, colors 0..2.
+
   function placeB(r, c, ci, type) {
     grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
   }
-  placeB(4, 1, 0); placeB(4, 3, 1); placeB(4, 5, 2);
-  placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
-  placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
 
-  // Sand image (32×32): simple horizontal stripes of colors 0..2
+  // Gravity Orb showcase:
+  // Sand is packed at the TOP of the image (rows 0–14).
+  // Buckets for cyan (0) and amber (1) are on rows 5–6,
+  // blocked from the top half of the grid by the gravity orb at row 2.
+  // Once the player clears row 0 (buckets there have a direct path),
+  // the orb auto-collects, the board flips, and the packed sand falls
+  // back down — letting the remaining buckets finish the job.
+
+  // Row 0 — directly accessible from belt
+  placeB(0, 1, 0); placeB(0, 3, 1); placeB(0, 5, 0);
+  // Row 1 — accessible after row 0 used
+  placeB(1, 0, 1); placeB(1, 2, 0); placeB(1, 4, 1); placeB(1, 6, 0);
+  // Row 2 — gravity orb (blocks path downward; collects once row 1 is clear)
+  grid[2 * GRID_W + 3] = { kind: 'gravity_orb' };
+  // Row 4–6 — extra buckets (now reachable after the flip)
+  placeB(4, 1, 1); placeB(4, 3, 0); placeB(4, 5, 1);
+  placeB(5, 0, 0); placeB(5, 2, 1); placeB(5, 4, 0); placeB(5, 6, 1);
+  placeB(6, 1, 0); placeB(6, 3, 1); placeB(6, 5, 0);
+
+  // Sand image: 2 colors packed into the top ~14 rows
   var sand = new Array(IMG_W * IMG_H);
-  for (var y = 0; y < IMG_H; y++) {
-    var ci = (y < 11) ? 0 : (y < 22) ? 1 : 2;
+  for (var i = 0; i < sand.length; i++) sand[i] = -1;
+  for (var y = 0; y < 14; y++) {
     for (var x = 0; x < IMG_W; x++) {
-      sand[y * IMG_W + x] = ci;
+      sand[y * IMG_W + x] = (x + y) % 2 === 0 ? 0 : 1;
     }
   }
-  return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+  return {
+    name: 'Gravity Orb',
+    desc: 'Clear the top rows — the orb flips the board!',
+    grid: grid,
+    sandImage: sand
+  };
 }
 
 // ============================================================

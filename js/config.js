@@ -106,6 +106,10 @@ var COLORS = [
 ];
 var NUM_COLORS = COLORS.length;
 
+// === GRAVITY ORB ===
+var gravityOrbCollected = false;
+var gravityFlipAnim = { active: false, t: 0, dur: 120, flipped: false };
+
 // === CALIBRATION (placeholders; sliders may bind later) ===
 var cal = {
   image:  { dx: 0, dy: 0, s: 1.0 },

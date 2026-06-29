@@ -37,6 +37,20 @@ function rRect(x, y, w, h, r) {
 
 function drawFrame() {
   ctx.clearRect(0, 0, W, H);
+
+  // Gravity orb flip animation: rotate the whole canvas 0→180° over 2 s.
+  // The sandGrid is flipped at the 90° midpoint (edge-on, invisible).
+  // After the animation, the transform is removed and play continues normally.
+  var doFlipAnim = (typeof gravityFlipAnim !== 'undefined') && gravityFlipAnim.active;
+  if (doFlipAnim) {
+    var p = gravityFlipAnim.t / gravityFlipAnim.dur;
+    var angle = Math.PI * p;
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(angle);
+    ctx.translate(-W / 2, -H / 2);
+  }
+
   drawBackground();
   drawSandImage();
   drawBelt();
@@ -44,6 +58,8 @@ function drawFrame() {
   drawJumpers();
   drawTrails();
   if (typeof drawParticles === 'function') drawParticles();
+
+  if (doFlipAnim) ctx.restore();
 }
 
 function drawBackground() {
@@ -254,6 +270,10 @@ function drawGrid() {
         ox = Math.sin(rejectShake.t * 1.5) * 4 * S;
       }
 
+      if (cell.kind === 'gravity_orb') {
+        if (typeof drawGravityOrb === 'function') drawGravityOrb(ctx, bx + ox, by, bw, bh, S, tick);
+        continue;
+      }
       if (cell.kind === 'wall') {
         drawWall(ctx, bx + ox, by, bw, bh, S, tick);
         continue;
