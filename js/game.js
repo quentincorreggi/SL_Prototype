@@ -396,46 +396,7 @@ function quitGame() {
 // ============================================================
 
 function demoLevel() {
-  var grid = new Array(GRID_W * GRID_H);
-  for (var i = 0; i < grid.length; i++) grid[i] = null;
-
-  function placeB(r, c, ci, type) {
-    grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
-  }
-
-  // Gravity Orb showcase:
-  // Sand is packed at the TOP of the image (rows 0–14).
-  // Buckets for cyan (0) and amber (1) are on rows 5–6,
-  // blocked from the top half of the grid by the gravity orb at row 2.
-  // Once the player clears row 0 (buckets there have a direct path),
-  // the orb auto-collects, the board flips, and the packed sand falls
-  // back down — letting the remaining buckets finish the job.
-
-  // Row 0 — directly accessible from belt
-  placeB(0, 1, 0); placeB(0, 3, 1); placeB(0, 5, 0);
-  // Row 1 — accessible after row 0 used
-  placeB(1, 0, 1); placeB(1, 2, 0); placeB(1, 4, 1); placeB(1, 6, 0);
-  // Row 2 — gravity orb (blocks path downward; collects once row 1 is clear)
-  grid[2 * GRID_W + 3] = { kind: 'gravity_orb' };
-  // Row 4–6 — extra buckets (now reachable after the flip)
-  placeB(4, 1, 1); placeB(4, 3, 0); placeB(4, 5, 1);
-  placeB(5, 0, 0); placeB(5, 2, 1); placeB(5, 4, 0); placeB(5, 6, 1);
-  placeB(6, 1, 0); placeB(6, 3, 1); placeB(6, 5, 0);
-
-  // Sand image: 2 colors packed into the top ~14 rows
-  var sand = new Array(IMG_W * IMG_H);
-  for (var i = 0; i < sand.length; i++) sand[i] = -1;
-  for (var y = 0; y < 14; y++) {
-    for (var x = 0; x < IMG_W; x++) {
-      sand[y * IMG_W + x] = (x + y) % 2 === 0 ? 0 : 1;
-    }
-  }
-  return {
-    name: 'Gravity Orb',
-    desc: 'Clear the top rows — the orb flips the board!',
-    grid: grid,
-    sandImage: sand
-  };
+  return {"name":"Custom Level gravity","desc":"My custom level gravity","grid":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":2},null,null,null,{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":0},null,null,null,{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":2},null,null,null,{"kind":"gravity_orb"},null,null,null,{"kind":"bucket","type":"default","ci":1},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":0},{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":2},{"kind":"bucket","type":"default","ci":1},null],"sandImage":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3]};
 }
 
 // ============================================================
