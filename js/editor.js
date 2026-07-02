@@ -570,6 +570,7 @@ function edBuildToolbar() {
   var types = [
     { id: 'default', label: 'Bucket' },
     { id: 'hidden',  label: 'Hidden' },
+    { id: 'vortex',  label: 'Vortex' },
     { id: 'tunnel',  label: 'Tunnel' },
     { id: 'wall',    label: 'Wall' },
     { id: 'erase',   label: 'Erase' }
@@ -588,7 +589,7 @@ function edBuildToolbar() {
   });
   tb.appendChild(typeRow);
 
-  if (edTool === 'default' || edTool === 'hidden') {
+  if (edTool === 'default' || edTool === 'hidden' || edTool === 'vortex') {
     var avail = edAvailableColors();
     if (avail.length === 0) {
       var msg = document.createElement('div');
@@ -671,7 +672,7 @@ function edApplyCellStyle(el, cell) {
 function edPaintCell(idx, eraseOverride) {
   if (eraseOverride || edTool === 'erase') {
     edLevel.grid[idx] = null;
-  } else if (edTool === 'default' || edTool === 'hidden') {
+  } else if (edTool === 'default' || edTool === 'hidden' || edTool === 'vortex') {
     if (edAvailableColors().length === 0) {
       edToast('Paint sand first.');
       return;

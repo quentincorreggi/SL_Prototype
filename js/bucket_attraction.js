@@ -24,6 +24,8 @@ function updateBucketAttraction() {
   for (var i = 0; i < BELT_SLOTS; i++) {
     var b = beltSlots[i];
     if (!b || b.reserved || b.done) continue;
+    // Vortex buckets collect from the image centre — handled in vortex.js.
+    if (b.type === 'vortex') continue;
     if (b.pullCooldown > 0) { b.pullCooldown--; continue; }
     if ((b.capacity || 0) <= 0) continue;
     if ((b.fill || 0) >= b.capacity) continue;

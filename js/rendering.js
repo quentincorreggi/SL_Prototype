@@ -39,6 +39,7 @@ function drawFrame() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
   drawSandImage();
+  if (typeof drawVortexOverlay === 'function') drawVortexOverlay();
   drawBelt();
   drawGrid();
   drawJumpers();
@@ -81,15 +82,44 @@ function drawSandImage() {
 
   // Grains
   var cs = L.image.cell;
+  var vs = (typeof vortexStrength !== 'undefined') ? vortexStrength : 0;
+  if (vs > 0.001) {
+    drawSandWarped(cs, vs);
+  } else {
+    for (var y = 0; y < SAND_H; y++) {
+      for (var x = 0; x < SAND_W; x++) {
+        var ci = sandGrid[sandIdx(x, y)];
+        if (ci < 0) continue;
+        ctx.fillStyle = COLORS[ci].fill;
+        ctx.fillRect(L.image.x + x * cs, L.image.y + y * cs, cs + 0.5, cs + 0.5);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// Draw the sand with a swirl warp: each grain is rotated around the image
+// centre by an amount that grows toward the middle (differential rotation),
+// which winds straight features into a spiral. `vs` is 0..1 strength.
+function drawSandWarped(cs, vs) {
+  var cx = SAND_W / 2 - 0.5, cy = SAND_H / 2 - 0.5;
+  var soft = VORTEX_SWIRL_SOFT;
+  var spin = vortexSpin;
+  var suck = 1 - VORTEX_INWARD_SUCK * vs;
   for (var y = 0; y < SAND_H; y++) {
     for (var x = 0; x < SAND_W; x++) {
       var ci = sandGrid[sandIdx(x, y)];
       if (ci < 0) continue;
+      var dx = x - cx, dy = y - cy;
+      var r = Math.sqrt(dx * dx + dy * dy);
+      var theta = Math.atan2(dy, dx) + spin * (soft / (r + soft)) * vs;
+      var r2 = r * suck;
+      var px = cx + r2 * Math.cos(theta);
+      var py = cy + r2 * Math.sin(theta);
       ctx.fillStyle = COLORS[ci].fill;
-      ctx.fillRect(L.image.x + x * cs, L.image.y + y * cs, cs + 0.5, cs + 0.5);
+      ctx.fillRect(L.image.x + px * cs, L.image.y + py * cs, cs + 0.9, cs + 0.9);
     }
   }
-  ctx.restore();
 }
 
 // ============================================================
@@ -180,6 +210,11 @@ function drawBeltBucket(s, b) {
     var w = size * scale, h = size * scale;
     var x = pos.x - w / 2, y = pos.y - h / 2;
     drawJar(ctx, x, y, w, h, displayCi, S, b.fill || 0, b.capacity || 0);
+  }
+  // Spinning spiral marks a vortex bucket while it rides the belt.
+  if (b.type === 'vortex' && typeof drawVortexBadge === 'function') {
+    drawVortexBadge(ctx, pos.x, pos.y + size * scale * 0.05,
+      size * scale * 0.22, S, tick * 0.09, 'rgba(255,255,255,0.85)');
   }
   ctx.restore();
 }
@@ -386,6 +421,16 @@ function drawTrails() {
     // the grain keeps homing in as the bucket scrolls.
     var x = t.fromX + (t.toX - t.fromX) * p;
     var y = t.fromY + (t.toY - t.fromY) * p;
+    // Vortex trails corkscrew: add a decaying perpendicular wobble so grains
+    // appear to spiral up out of the swirl.
+    if (t.spiral) {
+      var dxs = t.toX - t.fromX, dys = t.toY - t.fromY;
+      var len = Math.sqrt(dxs * dxs + dys * dys) || 1;
+      var amp = Math.sin(p * Math.PI) * 26 * S * (1 - p);
+      var wob = Math.sin(p * Math.PI * 3 + (t.spin || 0));
+      x += (-dys / len) * amp * wob;
+      y += (dxs / len) * amp * wob;
+    }
     var c = COLORS[t.ci];
     ctx.save();
     ctx.shadowColor = c.glow;

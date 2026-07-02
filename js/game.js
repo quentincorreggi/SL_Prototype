@@ -16,6 +16,7 @@ function initGame(levelData) {
   jumpers = [];
   particles = [];
   attractionTrails = [];
+  if (typeof resetVortex === 'function') resetVortex();
   rejectShake = { idx: -1, t: 0 };
   won = false;
   gameActive = true;
@@ -294,8 +295,14 @@ function update() {
   updateBelt();
   updateJumpers();
   updateRejectShake();
-  // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
-  if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
+  // Sand physics runs every SAND_FRAME_INTERVAL frames (debug slider). While
+  // a vortex bucket is on the belt, sand swirls toward the centre instead of
+  // falling straight down.
+  if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) {
+    if (typeof isVortexActive === 'function' && isVortexActive()) updateVortexPhysics();
+    else updateSand();
+  }
+  if (typeof updateVortex === 'function') updateVortex();
   updateBucketAttraction();
   updateAttractionTrails();
   updateColorDepletion();
@@ -391,23 +398,26 @@ function quitGame() {
 function demoLevel() {
   var grid = new Array(GRID_W * GRID_H);
   for (var i = 0; i < grid.length; i++) grid[i] = null;
-  // A small set of buckets on rows 4-6, colors 0..2.
-  function placeB(r, c, ci, type) {
-    grid[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
+  // Vortex buckets: tap one and the picture swirls into its centre.
+  function placeV(r, c, ci) {
+    grid[r * GRID_W + c] = { kind: 'bucket', type: 'vortex', ci: ci };
   }
-  placeB(4, 1, 0); placeB(4, 3, 1); placeB(4, 5, 2);
-  placeB(5, 0, 1); placeB(5, 2, 0); placeB(5, 4, 2, 'hidden'); placeB(5, 6, 0);
-  placeB(6, 1, 2); placeB(6, 3, 0); placeB(6, 5, 1);
+  // Two vortex buckets per ring colour so capacities stay reasonable.
+  placeV(5, 1, 10); placeV(5, 2, 0); placeV(5, 4, 1); placeV(5, 5, 2);
+  placeV(6, 1, 10); placeV(6, 2, 0); placeV(6, 4, 1); placeV(6, 5, 2);
 
-  // Sand image (32×32): simple horizontal stripes of colors 0..2
+  // Sand image (32×32): concentric rings ("target") so the swirl reads clearly.
   var sand = new Array(IMG_W * IMG_H);
+  var cx = IMG_W / 2 - 0.5, cy = IMG_H / 2 - 0.5;
   for (var y = 0; y < IMG_H; y++) {
-    var ci = (y < 11) ? 0 : (y < 22) ? 1 : 2;
     for (var x = 0; x < IMG_W; x++) {
+      var dx = x - cx, dy = y - cy;
+      var r = Math.sqrt(dx * dx + dy * dy);
+      var ci = (r < 6.5) ? 10 : (r < 11) ? 0 : (r < 15.5) ? 1 : 2;
       sand[y * IMG_W + x] = ci;
     }
   }
-  return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
+  return { name: 'Vortex', desc: 'Tap a vortex bucket — the image swirls inward', grid: grid, sandImage: sand };
 }
 
 // ============================================================
