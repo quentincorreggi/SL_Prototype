@@ -80,46 +80,19 @@ function drawSandImage() {
   ctx.fillStyle = '#FCEFD6';
   ctx.fillRect(L.image.x, L.image.y, L.image.w, L.image.h);
 
-  // Grains
+  // Grains — always drawn at their true grid positions. The vortex swirl is
+  // produced by the sand actually moving (updateVortexPhysics), not by warping
+  // the drawn image.
   var cs = L.image.cell;
-  var vs = (typeof vortexStrength !== 'undefined') ? vortexStrength : 0;
-  if (vs > 0.001) {
-    drawSandWarped(cs, vs);
-  } else {
-    for (var y = 0; y < SAND_H; y++) {
-      for (var x = 0; x < SAND_W; x++) {
-        var ci = sandGrid[sandIdx(x, y)];
-        if (ci < 0) continue;
-        ctx.fillStyle = COLORS[ci].fill;
-        ctx.fillRect(L.image.x + x * cs, L.image.y + y * cs, cs + 0.5, cs + 0.5);
-      }
-    }
-  }
-  ctx.restore();
-}
-
-// Draw the sand with a swirl warp: each grain is rotated around the image
-// centre by an amount that grows toward the middle (differential rotation),
-// which winds straight features into a spiral. `vs` is 0..1 strength.
-function drawSandWarped(cs, vs) {
-  var cx = SAND_W / 2 - 0.5, cy = SAND_H / 2 - 0.5;
-  var soft = VORTEX_SWIRL_SOFT;
-  var spin = vortexSpin;
-  var suck = 1 - VORTEX_INWARD_SUCK * vs;
   for (var y = 0; y < SAND_H; y++) {
     for (var x = 0; x < SAND_W; x++) {
       var ci = sandGrid[sandIdx(x, y)];
       if (ci < 0) continue;
-      var dx = x - cx, dy = y - cy;
-      var r = Math.sqrt(dx * dx + dy * dy);
-      var theta = Math.atan2(dy, dx) + spin * (soft / (r + soft)) * vs;
-      var r2 = r * suck;
-      var px = cx + r2 * Math.cos(theta);
-      var py = cy + r2 * Math.sin(theta);
       ctx.fillStyle = COLORS[ci].fill;
-      ctx.fillRect(L.image.x + px * cs, L.image.y + py * cs, cs + 0.9, cs + 0.9);
+      ctx.fillRect(L.image.x + x * cs, L.image.y + y * cs, cs + 0.5, cs + 0.5);
     }
   }
+  ctx.restore();
 }
 
 // ============================================================
