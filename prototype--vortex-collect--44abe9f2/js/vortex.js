@@ -82,16 +82,21 @@ function findGrainsNearestCenter(ci, count) {
 // Discretise a direction component to -1 / 0 / 1.
 function _vStep(v) { return v > 0.35 ? 1 : (v < -0.35 ? -1 : 0); }
 
-// One tick of inward+swirl migration. Replaces updateSand() while a vortex
-// is active. Grains step toward the centre along a curved path; inner cells
-// move first so outer grains can flow into the space they vacate.
+// One tick of the vortex flow. Replaces updateSand() while a vortex is active.
+// Every grain moves one cell along a tangential + inward path around the image
+// centre, so the entire sand field genuinely ROTATES and spirals inward — real
+// cellular movement, not a rendering warp:
+//   - if the target cell is empty (a drain hole), the grain flows into it;
+//   - if it's another grain, the two swap, which rotates the colour field.
+// Inner rings sweep through a larger angle per step than outer rings, so
+// straight features wind into a spiral over time.
 function updateVortexPhysics() {
   if (!vortexOrder || vortexOrder.length !== SAND_W * SAND_H) buildVortexOrder();
   var cx = SAND_W / 2 - 0.5, cy = SAND_H / 2 - 0.5;
   var moved = vortexMoved;
   for (var m = 0; m < moved.length; m++) moved[m] = 0;
 
-  var cosP = Math.cos(VORTEX_FLOW_ANGLE), sinP = Math.sin(VORTEX_FLOW_ANGLE);
+  var IN = VORTEX_INWARD_DRIFT;
   var ord = vortexOrder;
   for (var k = 0; k < ord.length; k++) {
     var idx = ord[k];
@@ -101,28 +106,35 @@ function updateVortexPhysics() {
     var x = idx % SAND_W, y = (idx / SAND_W) | 0;
     var dx = cx - x, dy = cy - y;
     var r = Math.sqrt(dx * dx + dy * dy);
-    if (r < 0.9) continue; // already at the eye — waits to be collected
-    var ux = dx / r, uy = dy / r;                 // inward unit vector
-    var rvx = ux * cosP - uy * sinP;              // rotated (curved) inward
-    var rvy = ux * sinP + uy * cosP;
+    if (r < 0.9) continue; // sitting in the eye — waits to be collected
+    var ux = dx / r, uy = dy / r;      // inward unit vector
+    var tx = -uy, ty = ux;             // counter-clockwise tangential
 
-    // Candidate steps, in preference order: curved-inward, straight-inward,
-    // tangential (so a grain never freezes just because one cell is blocked).
+    // Preferred direction: mostly orbit, with a pull toward the centre.
+    // Fallbacks keep a grain flowing if its ideal cell is taken.
     var cand = [
-      [_vStep(rvx), _vStep(rvy)],
-      [_vStep(ux), _vStep(uy)],
-      [_vStep(-uy), _vStep(ux)]
+      [_vStep(tx + IN * ux), _vStep(ty + IN * uy)],
+      [_vStep(tx), _vStep(ty)],
+      [_vStep(ux), _vStep(uy)]
     ];
-    for (var ci2 = 0; ci2 < cand.length; ci2++) {
-      var ax = cand[ci2][0], ay = cand[ci2][1];
+    for (var q = 0; q < cand.length; q++) {
+      var ax = cand[q][0], ay = cand[q][1];
       if (ax === 0 && ay === 0) continue;
       var nx = x + ax, ny = y + ay;
       if (nx < 0 || nx >= SAND_W || ny < 0 || ny >= SAND_H) continue;
       var nidx = ny * SAND_W + nx;
-      if (sandGrid[nidx] >= 0 || moved[nidx]) continue;
-      sandGrid[nidx] = ci;
-      sandGrid[idx] = -1;
-      moved[nidx] = 1;
+      if (moved[nidx]) continue;
+      var other = sandGrid[nidx];
+      if (other < 0) {
+        sandGrid[nidx] = ci;   // flow into an open drain hole
+        sandGrid[idx] = -1;
+        moved[nidx] = 1;
+      } else {
+        sandGrid[nidx] = ci;   // swap with a neighbour → rotate the field
+        sandGrid[idx] = other;
+        moved[nidx] = 1;
+        moved[idx] = 1;
+      }
       break;
     }
   }

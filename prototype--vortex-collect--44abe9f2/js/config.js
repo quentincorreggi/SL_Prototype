@@ -58,18 +58,18 @@ var BUCKET_POP_FRAMES = 18;    // duration of pop animation
 var JUMPER_FRAMES = 24;        // duration of grid→belt arc
 
 // === VORTEX (center-collection mechanic) ===
-// While a vortex bucket rides the belt, sand is drawn toward the CENTRE of
-// the image instead of falling down, swirling inward. Matching grains nearest
-// the centre are collected first, so the hole grows from the middle out.
-var vortexStrength = 0;        // eased 0..1 — how strong the swirl currently is
-var vortexSpin = 0;            // accumulated rotation phase (radians)
+// While a vortex bucket rides the belt, the sand grains themselves swirl
+// toward the CENTRE of the image instead of falling down — a real cellular
+// flow, no rendering distortion. Matching grains nearest the centre are
+// collected first, so the drain-hole grows from the middle out.
+var vortexStrength = 0;        // eased 0..1 — used to fade the swirl overlay in/out
+var vortexSpin = 0;            // accumulated rotation phase for the overlay (radians)
 var vortexOrder = null;        // cell indices sorted inner→outer (precomputed)
 var vortexMoved = null;        // scratch Uint8Array for the inward CA
-var VORTEX_EASE = 0.05;        // how fast strength ramps toward its target
-var VORTEX_SPIN_SPEED = 0.02;  // radians/frame of swirl rotation at full strength
-var VORTEX_SWIRL_SOFT = 7;     // cells — softens differential rotation near centre
-var VORTEX_FLOW_ANGLE = 0.6;   // radians — curvature of the inward grid flow
-var VORTEX_INWARD_SUCK = 0.05; // rendering-space inward pull fraction
+var VORTEX_EASE = 0.05;         // how fast the overlay fades toward its target
+var VORTEX_SPIN_SPEED = 0.05;   // radians/frame the overlay arms rotate at full strength
+var VORTEX_INWARD_DRIFT = 0.5;  // how strongly the swirl pulls grains inward vs. purely
+                                // orbiting (0 = pure rotation, higher = tighter spiral).
 
 // === GRID ===
 var GRID_W = 7, GRID_H = 7;

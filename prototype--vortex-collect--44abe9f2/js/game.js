@@ -406,18 +406,20 @@ function demoLevel() {
   placeV(5, 1, 10); placeV(5, 2, 0); placeV(5, 4, 1); placeV(5, 5, 2);
   placeV(6, 1, 10); placeV(6, 2, 0); placeV(6, 4, 1); placeV(6, 5, 2);
 
-  // Sand image (32×32): concentric rings ("target") so the swirl reads clearly.
+  // Sand image (32×32): a pinwheel of radial wedges. Unlike concentric rings,
+  // angular wedges make the rotation obvious as the sand actually swirls.
   var sand = new Array(IMG_W * IMG_H);
   var cx = IMG_W / 2 - 0.5, cy = IMG_H / 2 - 0.5;
+  var cols = [10, 0, 1, 2];
   for (var y = 0; y < IMG_H; y++) {
     for (var x = 0; x < IMG_W; x++) {
       var dx = x - cx, dy = y - cy;
-      var r = Math.sqrt(dx * dx + dy * dy);
-      var ci = (r < 6.5) ? 10 : (r < 11) ? 0 : (r < 15.5) ? 1 : 2;
-      sand[y * IMG_W + x] = ci;
+      var ang = Math.atan2(dy, dx) + Math.PI;         // 0..2π
+      var wedge = Math.floor(ang / (Math.PI * 2) * 8) % 8;
+      sand[y * IMG_W + x] = cols[wedge % cols.length];
     }
   }
-  return { name: 'Vortex', desc: 'Tap a vortex bucket — the image swirls inward', grid: grid, sandImage: sand };
+  return { name: 'Vortex', desc: 'Tap a vortex bucket — the sand swirls inward', grid: grid, sandImage: sand };
 }
 
 // ============================================================
