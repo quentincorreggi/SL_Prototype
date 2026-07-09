@@ -76,7 +76,17 @@ function edInit() {
 // ============================================================
 
 function edCloneWall(w) {
-  return { cells: (w.cells || []).slice(), threshold: Math.max(1, w.threshold | 0 || 1) };
+  return {
+    cells: (w.cells || []).slice(),
+    threshold: Math.max(1, w.threshold | 0 || 1),
+    color: (w.color | 0) || 0
+  };
+}
+
+// Default trigger color for a new wall: first color present in the sand image.
+function edDefaultWallColor() {
+  var avail = edAvailableColors();
+  return avail.length ? avail[0] : 0;
 }
 
 function edSnapshotState() {
@@ -397,16 +407,29 @@ function edBuildWallPanel(sb) {
       count.style.cssText = 'font-size:9px;color:#9C8A70';
       row.appendChild(count);
 
-      // Threshold stepper
+      // Trigger-color dot
+      var wc = COLORS[wall.color | 0] || COLORS[0];
+      var dot = document.createElement('span');
+      dot.title = 'Trigger color: ' + CLR_NAMES[wall.color | 0];
+      dot.style.cssText = 'width:12px;height:12px;border-radius:50%;flex:none;' +
+        'background:' + wc.fill + ';box-shadow:0 0 0 1px rgba(0,0,0,0.35)';
+      row.appendChild(dot);
+
+      // Threshold stepper — ± buttons plus a directly-typeable number.
       var stepper = document.createElement('div');
       stepper.style.cssText = 'display:flex;align-items:center;gap:2px';
       var minus = document.createElement('button');
       minus.textContent = '−';
       minus.style.cssText = 'width:18px;height:18px;border:none;border-radius:4px;background:#c9b79a;cursor:pointer;font-weight:bold';
       minus.onclick = function (e) { e.stopPropagation(); edWallSetThreshold(wi, -1); };
-      var val = document.createElement('span');
-      val.textContent = '×' + wall.threshold;
-      val.style.cssText = 'font-size:11px;font-weight:bold;min-width:20px;text-align:center;color:#5A4A38';
+      var val = document.createElement('input');
+      val.type = 'number';
+      val.min = '1';
+      val.value = wall.threshold;
+      val.title = 'Buckets to clear (type or use ± )';
+      val.style.cssText = 'width:34px;height:18px;text-align:center;font-size:11px;font-weight:bold;color:#5A4A38;border:1px solid #c9b79a;border-radius:4px;padding:0';
+      val.onclick = function (e) { e.stopPropagation(); };
+      val.onchange = function (e) { e.stopPropagation(); edWallSetThresholdAbs(wi, parseInt(val.value, 10)); };
       var plus = document.createElement('button');
       plus.textContent = '+';
       plus.style.cssText = 'width:18px;height:18px;border:none;border-radius:4px;background:#c9b79a;cursor:pointer;font-weight:bold';
@@ -422,12 +445,40 @@ function edBuildWallPanel(sb) {
       row.appendChild(del);
 
       sb.appendChild(row);
+
+      // Color picker for the selected wall — pick which bucket color breaks it.
+      if (sel) {
+        var pickWrap = document.createElement('div');
+        pickWrap.style.cssText = 'padding:2px 4px 6px;margin-bottom:4px;background:rgba(181,86,58,0.12);border-radius:0 0 6px 6px';
+        var pickLabel = document.createElement('div');
+        pickLabel.textContent = 'Breaks when this color clears:';
+        pickLabel.style.cssText = 'font-size:9px;color:#9C8A70;margin-bottom:3px';
+        pickWrap.appendChild(pickLabel);
+        var swatches = document.createElement('div');
+        swatches.style.cssText = 'display:flex;flex-wrap:wrap;gap:3px';
+        var avail = edAvailableColors();
+        if (!avail.length) for (var ac = 0; ac < NUM_COLORS; ac++) avail.push(ac);
+        if (avail.indexOf(wall.color | 0) < 0) avail.push(wall.color | 0);
+        avail.forEach(function (ci) {
+          var sw = document.createElement('button');
+          var cc = COLORS[ci];
+          var on = (ci === (wall.color | 0));
+          sw.title = CLR_NAMES[ci];
+          sw.style.cssText = 'width:18px;height:18px;border-radius:4px;cursor:pointer;' +
+            'background:linear-gradient(135deg,' + cc.light + ',' + cc.dark + ');' +
+            (on ? 'outline:2px solid #2b2016;outline-offset:1px;border:none' : 'border:1px solid rgba(0,0,0,0.25)');
+          sw.onclick = function (e) { e.stopPropagation(); edWallSetColor(wi, ci); };
+          swatches.appendChild(sw);
+        });
+        pickWrap.appendChild(swatches);
+        sb.appendChild(pickWrap);
+      }
     })(w);
   }
 }
 
 function edWallNewWall() {
-  edLevel.walls.push({ cells: [], threshold: 2 });
+  edLevel.walls.push({ cells: [], threshold: 2, color: edDefaultWallColor() });
   edSelectedWall = edLevel.walls.length - 1;
   edBuildToolSidebar();
   edRefreshSandGrid();
@@ -438,6 +489,16 @@ function edWallSelect(i) {
   edSelectedWall = i;
   edBuildToolSidebar();
   edRefreshSandGrid();
+}
+
+function edWallSetThresholdAbs(i, v) {
+  var wall = edLevel.walls[i];
+  if (!wall) return;
+  if (isNaN(v)) v = wall.threshold;
+  wall.threshold = Math.max(1, v | 0);
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+  edPushHistory();
 }
 
 function edWallSetThreshold(i, delta) {
@@ -459,9 +520,18 @@ function edWallDelete(i) {
 
 function edEnsureWall() {
   if (edSelectedWall < 0 || edSelectedWall >= edLevel.walls.length) {
-    edLevel.walls.push({ cells: [], threshold: 2 });
+    edLevel.walls.push({ cells: [], threshold: 2, color: edDefaultWallColor() });
     edSelectedWall = edLevel.walls.length - 1;
   }
+}
+
+function edWallSetColor(i, ci) {
+  var wall = edLevel.walls[i];
+  if (!wall) return;
+  wall.color = ci | 0;
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+  edPushHistory();
 }
 
 // Which wall (index) owns this image tile, or -1.
@@ -502,13 +572,14 @@ function edRenderEditorWalls() {
     var wall = walls[w];
     var sel = (w === edSelectedWall);
     var tint = sel ? 'rgba(181,86,58,0.72)' : 'rgba(110,70,45,0.5)';
+    var edge = (COLORS[wall.color | 0] || COLORS[0]).fill;  // border = trigger color
     var minIdx = Infinity;
     for (var k = 0; k < wall.cells.length; k++) {
       var idx = wall.cells[k];
       var el = edSandCells[idx];
       if (!el) continue;
       el.style.backgroundImage = 'linear-gradient(' + tint + ',' + tint + ')';
-      el.style.boxShadow = 'inset 0 0 0 1px rgba(50,32,20,0.9)';
+      el.style.boxShadow = 'inset 0 0 0 1px ' + edge;
       if (idx < minIdx) minIdx = idx;
     }
     if (minIdx !== Infinity) {
