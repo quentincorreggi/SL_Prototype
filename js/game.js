@@ -455,10 +455,11 @@ function _bwLevelFirstTouch() {
   _bwBkt(g, 0, 4, 2); _bwBkt(g, 0, 6, 2); _bwBkt(g, 1, 5, 2);   // magenta buckets
   return {
     name: 'Brick Wall — First Touch',
-    desc: 'One wall (×2). Clear 2 amber buckets to break it, then collect the magenta.',
+    desc: 'Amber wall (×2). Only amber clears break it — then collect the magenta.',
     grid: g,
     sandImage: s,
-    walls: [{ cells: _bwRectCells(14, 6, 21, 13), threshold: 2 }]
+    // Wall's trigger color is amber (1): clearing amber buckets breaks it.
+    walls: [{ cells: _bwRectCells(14, 6, 21, 13), threshold: 2, color: 1 }]
   };
 }
 
@@ -482,13 +483,16 @@ function _bwLevelMulti() {
   var wallB = _bwRectCells(17, 4, 20, 13).concat(_bwRectCells(21, 10, 24, 13));
   return {
     name: 'Brick Wall — Multi',
-    desc: '3 walls (×2 / ×4 / ×6) break in sequence as you keep clearing buckets.',
+    desc: 'Each wall is a different color — only that color breaks it. Cyan → magenta → lime reveals red.',
     grid: g,
     sandImage: s,
+    // Color-chain: clearing cyan breaks wall A (frees magenta), magenta breaks
+    // wall B (frees lime), lime breaks wall C (frees red). Colors are gated —
+    // clearing cyan never touches the magenta or lime walls.
     walls: [
-      { cells: _bwRectCells(9, 4, 14, 11), threshold: 2 },
-      { cells: wallB, threshold: 4 },
-      { cells: _bwRectCells(26, 4, 31, 11), threshold: 6 }
+      { cells: _bwRectCells(9, 4, 14, 11), threshold: 3, color: 0 },  // A: cyan
+      { cells: wallB, threshold: 2, color: 2 },                       // B: magenta
+      { cells: _bwRectCells(26, 4, 31, 11), threshold: 2, color: 5 }  // C: lime
     ]
   };
 }

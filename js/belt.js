@@ -47,8 +47,8 @@ function updateBelt() {
         if (typeof spawnBurst === 'function') {
           spawnBurst(pos.x, pos.y, COLORS[b.ci].fill, 14);
         }
-        // Any bucket clear knocks 1 off every active Brick Wall.
-        if (typeof onBucketCleared === 'function') onBucketCleared(pos.x, pos.y);
+        // A bucket clear knocks 1 off every active Brick Wall of the SAME color.
+        if (typeof onBucketCleared === 'function') onBucketCleared(pos.x, pos.y, b.ci);
       }
       if (b.popT >= BUCKET_POP_FRAMES) {
         beltSlots[s] = null;

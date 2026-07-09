@@ -52,6 +52,7 @@ function initBrickWalls(defs) {
         id: i,
         cells: cells,
         cellSet: {},
+        color: (d.color | 0) || 0,   // only buckets of THIS color decrement the wall
         threshold: th,
         remaining: th,
         state: 'idle',
@@ -108,10 +109,12 @@ function buildBrickFrozenMask() {
 // Bucket-clear hook → spawn a light per active wall
 // ------------------------------------------------------------
 
-function onBucketCleared(bx, by) {
+// A bucket of color `ci` just cleared. Only walls of the SAME color react.
+function onBucketCleared(bx, by, ci) {
   for (var w = 0; w < brickWalls.length; w++) {
     var wall = brickWalls[w];
     if (wall.state !== 'idle' || wall.remaining <= 0) continue;
+    if (wall.color !== ci) continue;   // color-gated: other colors don't touch it
     var bp = wallBadgeCanvas(wall);
     brickLights.push({
       x: bx, y: by,
@@ -345,14 +348,16 @@ function drawWallBadge(ctx, wall, px) {
   drawDynStick(ctx, bp.x - bandW * 0.22, by - px * 0.55, px * 0.42, px * 1.0, fuse);
   drawDynStick(ctx, bp.x + bandW * 0.22, by - px * 0.55, px * 0.42, px * 1.0, fuse);
 
-  // Metal band (blue/purple), riveted at both ends.
+  // Metal band — tinted to the wall's color so its trigger color is readable
+  // at a glance (only buckets of this color decrement the wall).
+  var wc = COLORS[wall.color] || COLORS[0];
   var g = ctx.createLinearGradient(bx, by, bx, by + bandH);
-  g.addColorStop(0, '#8a7be0');
-  g.addColorStop(0.5, '#5b6cc9');
-  g.addColorStop(1, '#3d47a0');
+  g.addColorStop(0, wc.light);
+  g.addColorStop(0.5, wc.fill);
+  g.addColorStop(1, wc.dark);
   ctx.fillStyle = g;
   rRect(bx, by, bandW, bandH, bandH * 0.28); ctx.fill();
-  ctx.strokeStyle = '#2b3170';
+  ctx.strokeStyle = wc.dark;
   ctx.lineWidth = Math.max(1, px * 0.10);
   rRect(bx, by, bandW, bandH, bandH * 0.28); ctx.stroke();
   // rivets
