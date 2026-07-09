@@ -10,6 +10,7 @@ function initGame(levelData) {
   SAND_H = IMG_H * SAND_SUBDIV;
   sandGrid = new Int8Array(SAND_W * SAND_H);
   for (var s = 0; s < sandGrid.length; s++) sandGrid[s] = -1;
+  sandFrozen = new Uint8Array(SAND_W * SAND_H);
 
   computeLayout();
   initBelt();
@@ -55,7 +56,12 @@ function initGame(levelData) {
     }
   }
 
+  // Brick Walls (painting-layer overlay) — freeze the sand beneath them.
+  // Built after the sand grid exists so the frozen mask lines up.
+  if (typeof initBrickWalls === 'function') initBrickWalls(lvl.walls);
+
   // Capacities are derived from sand and buckets together; computed once.
+  // Frozen sand still counts, so per-color capacity accounts for walled sand.
   computeLevelCapacities();
   updateTunnels();
   updateBucketActivation();
@@ -294,6 +300,7 @@ function update() {
   updateBelt();
   updateJumpers();
   updateRejectShake();
+  if (typeof updateBrickWalls === 'function') updateBrickWalls();
   // Sand CA runs every SAND_FRAME_INTERVAL frames (debug slider).
   if (SAND_FRAME_INTERVAL <= 1 || tick % SAND_FRAME_INTERVAL === 0) updateSand();
   updateBucketAttraction();
@@ -409,6 +416,86 @@ function demoLevel() {
   }
   return { name: 'Demo', desc: '3 colors, 10 buckets', grid: grid, sandImage: sand };
 }
+
+// ============================================================
+// Brick Wall showcase levels (loaded from the start screen)
+// ============================================================
+
+function _bwBlankSand() {
+  var s = new Array(IMG_W * IMG_H);
+  for (var i = 0; i < s.length; i++) s[i] = -1;
+  return s;
+}
+function _bwFillRect(sand, x0, y0, x1, y1, ci) {
+  for (var y = y0; y <= y1; y++)
+    for (var x = x0; x <= x1; x++)
+      if (x >= 0 && x < IMG_W && y >= 0 && y < IMG_H) sand[y * IMG_W + x] = ci;
+}
+function _bwRectCells(x0, y0, x1, y1) {
+  var a = [];
+  for (var y = y0; y <= y1; y++)
+    for (var x = x0; x <= x1; x++) a.push(y * IMG_W + x);
+  return a;
+}
+function _bwBlankGrid() {
+  var g = new Array(GRID_W * GRID_H);
+  for (var i = 0; i < g.length; i++) g[i] = null;
+  return g;
+}
+function _bwBkt(g, r, c, ci, type) {
+  g[r * GRID_W + c] = { kind: 'bucket', type: type || 'default', ci: ci };
+}
+
+function _bwLevelFirstTouch() {
+  var s = _bwBlankSand();
+  _bwFillRect(s, 4, 6, 11, 13, 1);    // amber block — collectable at start
+  _bwFillRect(s, 14, 6, 21, 13, 2);   // magenta block — frozen under the wall
+  var g = _bwBlankGrid();
+  _bwBkt(g, 0, 0, 1); _bwBkt(g, 0, 2, 1); _bwBkt(g, 1, 1, 1);   // amber buckets
+  _bwBkt(g, 0, 4, 2); _bwBkt(g, 0, 6, 2); _bwBkt(g, 1, 5, 2);   // magenta buckets
+  return {
+    name: 'Brick Wall — First Touch',
+    desc: 'One wall (×2). Clear 2 amber buckets to break it, then collect the magenta.',
+    grid: g,
+    sandImage: s,
+    walls: [{ cells: _bwRectCells(14, 6, 21, 13), threshold: 2 }]
+  };
+}
+
+function _bwLevelMulti() {
+  // Each color lives in its own vertical column band with a clear path down
+  // to the bottom (the belt only reaches sand that settles at the image
+  // floor). Walls sit in the upper rows with empty space beneath, so freed
+  // sand falls cleanly to its own band. Cyan is collectable from the start;
+  // clearing it chips every wall down, and each break frees the next color.
+  var s = _bwBlankSand();
+  _bwFillRect(s, 1, 16, 6, 31, 0);    // cyan — collectable at start (reaches floor)
+  _bwFillRect(s, 9, 4, 14, 11, 2);    // magenta — under wall A (×2)
+  _bwFillRect(s, 17, 4, 20, 13, 5);   // lime — under wall B (L-shape, ×4)
+  _bwFillRect(s, 21, 10, 24, 13, 5);
+  _bwFillRect(s, 26, 4, 31, 11, 8);   // red — under wall C (×6)
+  var g = _bwBlankGrid();
+  _bwBkt(g, 0, 0, 0); _bwBkt(g, 0, 2, 0); _bwBkt(g, 0, 4, 0);   // cyan ×3
+  _bwBkt(g, 1, 1, 2); _bwBkt(g, 1, 3, 2);                        // magenta ×2
+  _bwBkt(g, 2, 0, 5); _bwBkt(g, 2, 2, 5);                        // lime ×2
+  _bwBkt(g, 3, 1, 8); _bwBkt(g, 3, 3, 8);                        // red ×2
+  var wallB = _bwRectCells(17, 4, 20, 13).concat(_bwRectCells(21, 10, 24, 13));
+  return {
+    name: 'Brick Wall — Multi',
+    desc: '3 walls (×2 / ×4 / ×6) break in sequence as you keep clearing buckets.',
+    grid: g,
+    sandImage: s,
+    walls: [
+      { cells: _bwRectCells(9, 4, 14, 11), threshold: 2 },
+      { cells: wallB, threshold: 4 },
+      { cells: _bwRectCells(26, 4, 31, 11), threshold: 6 }
+    ]
+  };
+}
+
+var BRICK_LEVELS = [_bwLevelFirstTouch(), _bwLevelMulti()];
+// Surface them in the LEVELS array too (data completeness).
+LEVELS = BRICK_LEVELS.slice();
 
 // ============================================================
 // Boot

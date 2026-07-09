@@ -39,6 +39,17 @@ var SAND_SUBDIV = 3;
 var SAND_W = IMG_W * SAND_SUBDIV, SAND_H = IMG_H * SAND_SUBDIV;
 var sandGrid = new Int8Array(SAND_W * SAND_H);   // color index 0..NUM_COLORS-1, or -1 for empty
 
+// Cells frozen by an active Brick Wall — 1 = frozen (won't fall, can't be
+// pulled, acts as solid). Same length as sandGrid; rebuilt at initGame and
+// whenever a wall breaks. Sized alongside sandGrid.
+var sandFrozen = new Uint8Array(SAND_W * SAND_H);
+
+// === BRICK WALL (painting-layer overlay mechanic) ===
+var brickWalls = [];   // runtime wall instances (see js/brick_wall.js)
+var brickLights = [];  // white light projectiles: cleared bucket → wall badge
+var brickDebris = [];  // blast debris pieces
+var brickShake = 0;    // screen-shake magnitude (px, pre-scale); decays each frame
+
 // === BELT ===
 var BELT_SLOTS = 5;
 var BELT_SPEED = 0.007;        // slot-fractions per frame (one slot per ~2.4s at 60fps)

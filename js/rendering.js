@@ -38,12 +38,23 @@ function rRect(x, y, w, h, r) {
 function drawFrame() {
   ctx.clearRect(0, 0, W, H);
   drawBackground();
+  // Brick Wall blast shake — jostle the whole scene briefly.
+  var shx = 0, shy = 0;
+  if (typeof brickShake !== 'undefined' && brickShake > 0) {
+    shx = (Math.random() * 2 - 1) * brickShake * S;
+    shy = (Math.random() * 2 - 1) * brickShake * S;
+  }
+  ctx.save();
+  if (shx || shy) ctx.translate(shx, shy);
   drawSandImage();
+  if (typeof drawBrickWalls === 'function') drawBrickWalls(ctx);
   drawBelt();
   drawGrid();
   drawJumpers();
   drawTrails();
   if (typeof drawParticles === 'function') drawParticles();
+  if (typeof drawBrickWallFX === 'function') drawBrickWallFX(ctx);
+  ctx.restore();
 }
 
 function drawBackground() {

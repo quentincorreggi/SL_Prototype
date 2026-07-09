@@ -20,8 +20,12 @@ var edLevel = {
   name: 'Custom Level',
   desc: 'My custom level',
   grid: new Array(GRID_W * GRID_H),
-  sandImage: new Array(IMG_W * IMG_H)
+  sandImage: new Array(IMG_W * IMG_H),
+  walls: []   // Brick Walls: [{ cells:[imgIdx...], threshold }]
 };
+
+// Brick Wall editor state — which wall the Brick Wall tool paints into.
+var edSelectedWall = -1;
 
 // --- Bucket-grid state ---
 var edTool = 'default';     // 'default' | 'hidden' | 'tunnel' | 'wall' | 'erase'
@@ -53,6 +57,8 @@ var ED_HISTORY_LIMIT = 80;
 function edInit() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.walls = [];
+  edSelectedWall = -1;
   edBuildToolSidebar();
   edBuildSandGrid();
   edBuildToolbar();
@@ -69,12 +75,17 @@ function edInit() {
 // Undo / Redo — full snapshot per discrete edit (stroke, cell, etc.)
 // ============================================================
 
+function edCloneWall(w) {
+  return { cells: (w.cells || []).slice(), threshold: Math.max(1, w.threshold | 0 || 1) };
+}
+
 function edSnapshotState() {
   return {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    walls: (edLevel.walls || []).map(edCloneWall)
   };
 }
 
@@ -95,6 +106,8 @@ function edRestoreState(s) {
   edLevel.desc = s.desc;
   edLevel.grid = s.grid.map(cloneCellForLevel);
   edLevel.sandImage = s.sandImage.slice();
+  edLevel.walls = (s.walls || []).map(edCloneWall);
+  if (edSelectedWall >= edLevel.walls.length) edSelectedWall = edLevel.walls.length - 1;
   // Cancel any in-progress drag so a subsequent move event won't restore
   // the pre-drag snapshot over the just-restored state.
   edDragging = false;
@@ -105,6 +118,7 @@ function edRestoreState(s) {
   var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
   var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
   edRefreshSandGrid();
+  edBuildToolSidebar();
   edBuildGrid();
   edBuildToolbar();
   edSelectedTunnel = -1;
@@ -256,7 +270,8 @@ var SAND_TOOLS = [
   { id: 'fill',    icon: '▣', label: 'Fill' },
   { id: 'rect',    icon: '◻', label: 'Rect' },
   { id: 'ellipse', icon: '○', label: 'Oval' },
-  { id: 'line',    icon: '╲', label: 'Line' }
+  { id: 'line',    icon: '╲', label: 'Line' },
+  { id: 'brickwall', icon: '🧱', label: 'Brick Wall' }
 ];
 var BRUSH_SIZES = [1, 2, 3, 4];
 
@@ -275,9 +290,12 @@ function edBuildToolSidebar() {
     btn.className = 'ed-tool-btn' + (edSandMode === t.id ? ' active' : '');
     btn.innerHTML = '<span class="ed-tool-icon">' + t.icon + '</span><span>' + t.label + '</span>';
     btn.title = t.label;
-    btn.onclick = function () { edSandMode = t.id; edBuildToolSidebar(); };
+    btn.onclick = function () { edSandMode = t.id; edBuildToolSidebar(); edRefreshSandGrid(); };
     sb.appendChild(btn);
   });
+
+  // Brick Wall tool → wall management panel instead of size/color.
+  if (edSandMode === 'brickwall') { edBuildWallPanel(sb); return; }
 
   // Brush size
   var sizeLabel = document.createElement('div');
@@ -323,6 +341,192 @@ function edBuildToolSidebar() {
 }
 
 // ============================================================
+// Brick Wall tool — sidebar panel + painting
+// ============================================================
+
+var edWallStroke = 'paint';   // 'paint' | 'erase' during a Brick Wall drag
+
+function edBuildWallPanel(sb) {
+  var label = document.createElement('div');
+  label.className = 'ed-tool-section-label';
+  label.textContent = 'Brick Walls';
+  sb.appendChild(label);
+
+  var help = document.createElement('div');
+  help.style.cssText = 'font-size:10px;color:#9C8A70;line-height:1.35;margin:0 2px 6px';
+  help.textContent = 'Pick a wall, then paint tiles on the image to cover them. Right-click removes tiles. Sand under a wall is frozen until it breaks.';
+  sb.appendChild(help);
+
+  var addBtn = document.createElement('button');
+  addBtn.className = 'ed-tool-btn';
+  addBtn.style.cssText = 'width:100%;justify-content:center;margin-bottom:6px';
+  addBtn.innerHTML = '<span class="ed-tool-icon">＋</span><span>New Wall</span>';
+  addBtn.onclick = function () { edWallNewWall(); };
+  sb.appendChild(addBtn);
+
+  var walls = edLevel.walls || [];
+  if (!walls.length) {
+    var none = document.createElement('div');
+    none.style.cssText = 'font-size:11px;color:#9C8A70;font-style:italic;text-align:center;padding:4px';
+    none.textContent = 'No walls yet — click “New Wall”.';
+    sb.appendChild(none);
+    return;
+  }
+
+  for (var w = 0; w < walls.length; w++) {
+    (function (wi) {
+      var wall = walls[wi];
+      var sel = (wi === edSelectedWall);
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px;margin-bottom:4px;border-radius:6px;cursor:pointer;' +
+        (sel ? 'background:rgba(181,86,58,0.35);outline:2px solid #b5563a;' : 'background:rgba(120,70,40,0.15);');
+      row.onclick = function () { edWallSelect(wi); };
+
+      var brick = document.createElement('span');
+      brick.textContent = '🧱';
+      brick.style.cssText = 'font-size:14px';
+      row.appendChild(brick);
+
+      var name = document.createElement('span');
+      name.textContent = 'Wall ' + (wi + 1);
+      name.style.cssText = 'font-size:11px;font-weight:bold;flex:1;color:#5A4A38';
+      row.appendChild(name);
+
+      var count = document.createElement('span');
+      count.textContent = wall.cells.length + ' tiles';
+      count.style.cssText = 'font-size:9px;color:#9C8A70';
+      row.appendChild(count);
+
+      // Threshold stepper
+      var stepper = document.createElement('div');
+      stepper.style.cssText = 'display:flex;align-items:center;gap:2px';
+      var minus = document.createElement('button');
+      minus.textContent = '−';
+      minus.style.cssText = 'width:18px;height:18px;border:none;border-radius:4px;background:#c9b79a;cursor:pointer;font-weight:bold';
+      minus.onclick = function (e) { e.stopPropagation(); edWallSetThreshold(wi, -1); };
+      var val = document.createElement('span');
+      val.textContent = '×' + wall.threshold;
+      val.style.cssText = 'font-size:11px;font-weight:bold;min-width:20px;text-align:center;color:#5A4A38';
+      var plus = document.createElement('button');
+      plus.textContent = '+';
+      plus.style.cssText = 'width:18px;height:18px;border:none;border-radius:4px;background:#c9b79a;cursor:pointer;font-weight:bold';
+      plus.onclick = function (e) { e.stopPropagation(); edWallSetThreshold(wi, 1); };
+      stepper.appendChild(minus); stepper.appendChild(val); stepper.appendChild(plus);
+      row.appendChild(stepper);
+
+      var del = document.createElement('button');
+      del.textContent = '✕';
+      del.title = 'Delete wall';
+      del.style.cssText = 'width:18px;height:18px;border:none;border-radius:4px;background:#d98a7a;color:#fff;cursor:pointer';
+      del.onclick = function (e) { e.stopPropagation(); edWallDelete(wi); };
+      row.appendChild(del);
+
+      sb.appendChild(row);
+    })(w);
+  }
+}
+
+function edWallNewWall() {
+  edLevel.walls.push({ cells: [], threshold: 2 });
+  edSelectedWall = edLevel.walls.length - 1;
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+  edPushHistory();
+}
+
+function edWallSelect(i) {
+  edSelectedWall = i;
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+}
+
+function edWallSetThreshold(i, delta) {
+  var wall = edLevel.walls[i];
+  if (!wall) return;
+  wall.threshold = Math.max(1, (wall.threshold | 0) + delta);
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+  edPushHistory();
+}
+
+function edWallDelete(i) {
+  edLevel.walls.splice(i, 1);
+  if (edSelectedWall >= edLevel.walls.length) edSelectedWall = edLevel.walls.length - 1;
+  edBuildToolSidebar();
+  edRefreshSandGrid();
+  edPushHistory();
+}
+
+function edEnsureWall() {
+  if (edSelectedWall < 0 || edSelectedWall >= edLevel.walls.length) {
+    edLevel.walls.push({ cells: [], threshold: 2 });
+    edSelectedWall = edLevel.walls.length - 1;
+  }
+}
+
+// Which wall (index) owns this image tile, or -1.
+function edWallOwnerOf(idx) {
+  var walls = edLevel.walls || [];
+  for (var w = 0; w < walls.length; w++) {
+    if (walls[w].cells.indexOf(idx) >= 0) return w;
+  }
+  return -1;
+}
+
+// Returns true if the tile set changed.
+function edWallPaintCell(idx, erase) {
+  if (erase) {
+    var o = edWallOwnerOf(idx);
+    if (o < 0) return false;
+    var arr = edLevel.walls[o].cells;
+    arr.splice(arr.indexOf(idx), 1);
+    return true;
+  }
+  edEnsureWall();
+  var owner = edWallOwnerOf(idx);
+  if (owner >= 0) return false;   // already covered (this or another wall) — no overlap
+  edLevel.walls[edSelectedWall].cells.push(idx);
+  return true;
+}
+
+function edWallApplyAt(pt) {
+  var idx = pt.y * IMG_W + pt.x;
+  if (edWallPaintCell(idx, edWallStroke === 'erase')) edRefreshSandGrid();
+}
+
+// Overlay wall tint + threshold badge onto the editor sand grid.
+function edRenderEditorWalls() {
+  if (!edSandCells.length) return;
+  var walls = edLevel.walls || [];
+  for (var w = 0; w < walls.length; w++) {
+    var wall = walls[w];
+    var sel = (w === edSelectedWall);
+    var tint = sel ? 'rgba(181,86,58,0.72)' : 'rgba(110,70,45,0.5)';
+    var minIdx = Infinity;
+    for (var k = 0; k < wall.cells.length; k++) {
+      var idx = wall.cells[k];
+      var el = edSandCells[idx];
+      if (!el) continue;
+      el.style.backgroundImage = 'linear-gradient(' + tint + ',' + tint + ')';
+      el.style.boxShadow = 'inset 0 0 0 1px rgba(50,32,20,0.9)';
+      if (idx < minIdx) minIdx = idx;
+    }
+    if (minIdx !== Infinity) {
+      var bel = edSandCells[minIdx];
+      bel.textContent = '' + wall.threshold;
+      bel.style.color = '#fff';
+      bel.style.fontSize = '7px';
+      bel.style.fontWeight = 'bold';
+      bel.style.lineHeight = '1';
+      bel.style.textShadow = '0 0 2px #000,0 0 2px #000';
+      bel.style.display = 'flex';
+      bel.style.alignItems = 'center';
+      bel.style.justifyContent = 'center';
+    }
+  }
+}
+
+// ============================================================
 // Left pane — Sand image grid (built once, updated by style)
 // ============================================================
 
@@ -338,6 +542,7 @@ function edBuildSandGrid() {
     g.appendChild(px);
     edSandCells.push(px);
   }
+  edRenderEditorWalls();
 }
 
 function edRefreshSandGrid() {
@@ -348,6 +553,7 @@ function edRefreshSandGrid() {
   for (var i = 0; i < edSandCells.length; i++) {
     edApplySandCell(edSandCells[i], edLevel.sandImage[i]);
   }
+  edRenderEditorWalls();
 }
 
 function edApplySandCell(el, ci) {
@@ -356,6 +562,11 @@ function edApplySandCell(el, ci) {
   } else {
     el.style.background = COLORS[ci].fill;
   }
+  // Clear any Brick Wall overlay styling (re-applied by edRenderEditorWalls).
+  // Setting `background` shorthand above already clears background-image.
+  el.style.boxShadow = '';
+  if (el.textContent) el.textContent = '';
+  el.style.display = '';
 }
 
 // Map a pointer event to sand-cell coords (clamped to bounds). Returns null
@@ -393,6 +604,18 @@ function onSandPointerDown(e) {
   }
   // Right-click forces eraser regardless of current tool
   var rightClick = (e.button === 2 || e.buttons === 2);
+
+  // Brick Wall tool paints tiles into the selected wall (right-click removes).
+  if (edSandMode === 'brickwall') {
+    edDragging = true;
+    edDragMode = 'brickwall';
+    edDragStart = pt;
+    edDragLast = pt;
+    edWallStroke = rightClick ? 'erase' : 'paint';
+    edWallApplyAt(pt);
+    return;
+  }
+
   var mode = rightClick ? 'eraser' : edSandMode;
   var color = rightClick ? -1 : edSandTool;
 
@@ -433,6 +656,11 @@ function onSandPointerMove(e) {
   var pt = pointerToSandCell(e);
   if (!pt) return;
 
+  if (edDragMode === 'brickwall') {
+    edWallApplyAt(pt);
+    edDragLast = pt;
+    return;
+  }
   if (edDragMode === 'brush' || edDragMode === 'eraser') {
     var color = edDragMode === 'eraser' ? -1 : edSandTool;
     paintLine(edDragLast.x, edDragLast.y, pt.x, pt.y, color, edBrushSize);
@@ -458,11 +686,13 @@ function onSandPointerMove(e) {
 
 function onSandPointerUp(e) {
   if (!edDragging) return;
+  var wasBrick = (edDragMode === 'brickwall');
   edDragging = false;
   edDragMode = null;
   edDragStart = null;
   edDragLast = null;
   edSnapshot = null;
+  if (wasBrick) edBuildToolSidebar();   // refresh tile counts in the wall list
   edOnSandChanged();
   edPushHistory();
 }
@@ -794,7 +1024,10 @@ function edHideTunnelPanel() {
 function edClearAll() {
   for (var i = 0; i < edLevel.grid.length; i++) edLevel.grid[i] = null;
   for (var i = 0; i < edLevel.sandImage.length; i++) edLevel.sandImage[i] = -1;
+  edLevel.walls = [];
+  edSelectedWall = -1;
   edHideTunnelPanel();
+  edBuildToolSidebar();
   edBuildGrid();
   edRefreshSandGrid();
   edBuildToolbar();
@@ -846,6 +1079,9 @@ function edLoadPreset(idx) {
   var p = ED_PRESETS[idx];
   if (!p) return;
   edLevel.sandImage = p.img.slice();
+  edLevel.walls = [];            // walls may reference tiles the preset replaced
+  edSelectedWall = -1;
+  edBuildToolSidebar();
   edRefreshSandGrid();
   edOnSandChanged();
   edPushHistory();
@@ -914,6 +1150,9 @@ function edImportPNG(e) {
         edLevel.sandImage[i] = nearestColorIndex(r, g, b);
       }
     }
+    edLevel.walls = [];   // fresh image — drop any walls tied to old tiles
+    edSelectedWall = -1;
+    edBuildToolSidebar();
     edRefreshSandGrid();
     edOnSandChanged();
     edPushHistory();
@@ -973,7 +1212,8 @@ function editorTestPlay() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid.map(cloneCellForLevel),
-    sandImage: edLevel.sandImage.slice()
+    sandImage: edLevel.sandImage.slice(),
+    walls: (edLevel.walls || []).map(edCloneWall)
   });
 }
 
@@ -998,7 +1238,8 @@ function editorExportJSON() {
     name: edLevel.name,
     desc: edLevel.desc,
     grid: edLevel.grid,
-    sandImage: Array.from(edLevel.sandImage || [])
+    sandImage: Array.from(edLevel.sandImage || []),
+    walls: (edLevel.walls || []).map(edCloneWall)
   });
   ta.select();
   edToast('Exported — select + copy.');
@@ -1022,9 +1263,12 @@ function editorImportJSON() {
     while (edLevel.grid.length < GRID_W * GRID_H) edLevel.grid.push(null);
     edLevel.sandImage = (data.sandImage || []).slice(0, IMG_W * IMG_H);
     while (edLevel.sandImage.length < IMG_W * IMG_H) edLevel.sandImage.push(-1);
+    edLevel.walls = (data.walls || []).map(edCloneWall);
+    edSelectedWall = edLevel.walls.length - 1;
     var nameEl = document.getElementById('ed-name'); if (nameEl) nameEl.value = edLevel.name;
     var descEl = document.getElementById('ed-desc'); if (descEl) descEl.value = edLevel.desc;
     edRefreshSandGrid();
+    edBuildToolSidebar();
     edBuildGrid();
     edBuildToolbar();
     edRefreshLiveSections();

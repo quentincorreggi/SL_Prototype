@@ -274,6 +274,8 @@
   </div>
   <div class="ls-actions">
     <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
+    <button class="ls-editor-btn" onclick="startBrickDemo(0)"><span style="font-size:22px">&#129521;</span> Brick Wall Demo</button>
+    <button class="ls-editor-btn" onclick="startBrickDemo(1)"><span style="font-size:22px">&#129521;</span> Brick Wall: Multi</button>
     <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
   </div>
 </div>
@@ -344,6 +346,16 @@
     if (typeof initGame === 'function') initGame();
     if (typeof ensureAudio === 'function') ensureAudio();
   }
+  function startBrickDemo(i) {
+    var ls = document.getElementById('level-screen');
+    var ed = document.getElementById('editor-screen');
+    if (ls) ls.classList.add('hidden');
+    if (ed) ed.classList.add('hidden');
+    if (typeof initGame === 'function' && typeof BRICK_LEVELS !== 'undefined') {
+      initGame(BRICK_LEVELS[i || 0]);
+    }
+    if (typeof ensureAudio === 'function') ensureAudio();
+  }
 </script>
 
 <!-- Scripts: order matters -->
@@ -360,6 +372,7 @@
 <script src="js/bucket_attraction.js"></script>
 <script src="js/tunnel.js"></script>
 <script src="js/wall.js"></script>
+<script src="js/brick_wall.js"></script>
 <script src="js/rendering.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/game.js"></script>

@@ -36,11 +36,13 @@ function updateSand() {
 function processSandCell(x, y, cx) {
   var idx = sandIdx(x, y);
   if (sandGrid[idx] < 0) return;
+  // Frozen sand (under an intact Brick Wall) never moves.
+  if (sandFrozen[idx]) return;
   var ci = sandGrid[idx];
 
-  // 1. Straight down
+  // 1. Straight down (frozen cells act as solid — never fall into them)
   var belowIdx = sandIdx(x, y + 1);
-  if (sandGrid[belowIdx] < 0) {
+  if (sandGrid[belowIdx] < 0 && !sandFrozen[belowIdx]) {
     sandGrid[belowIdx] = ci;
     sandGrid[idx] = -1;
     return;
@@ -60,13 +62,13 @@ function processSandCell(x, y, cx) {
   }
 
   var nx = x + slipFirst;
-  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
+  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0 && !sandFrozen[sandIdx(nx, y + 1)]) {
     sandGrid[sandIdx(nx, y + 1)] = ci;
     sandGrid[idx] = -1;
     return;
   }
   nx = x + slipSecond;
-  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0) {
+  if (nx >= 0 && nx < SAND_W && sandGrid[sandIdx(nx, y + 1)] < 0 && !sandFrozen[sandIdx(nx, y + 1)]) {
     sandGrid[sandIdx(nx, y + 1)] = ci;
     sandGrid[idx] = -1;
     return;
@@ -92,7 +94,8 @@ function findNearestGrain(cx, cy, ci, maxR) {
   var maxY = Math.min(SAND_H - 1, Math.ceil(cy + maxR));
   for (var y = minY; y <= maxY; y++) {
     for (var x = minX; x <= maxX; x++) {
-      if (sandGrid[sandIdx(x, y)] !== ci) continue;
+      var gi = sandIdx(x, y);
+      if (sandGrid[gi] !== ci || sandFrozen[gi]) continue;
       var dx = x - cx, dy = y - cy;
       var d2 = dx * dx + dy * dy;
       if (d2 < bestD2) {
@@ -116,7 +119,8 @@ function findGrainsInRadius(cx, cy, ci, maxR, maxN) {
   var r2 = maxR * maxR;
   for (var y = minY; y <= maxY; y++) {
     for (var x = minX; x <= maxX; x++) {
-      if (sandGrid[sandIdx(x, y)] !== ci) continue;
+      var gi = sandIdx(x, y);
+      if (sandGrid[gi] !== ci || sandFrozen[gi]) continue;
       var dx = x - cx, dy = y - cy;
       var d2 = dx * dx + dy * dy;
       if (d2 <= r2) out.push({ x: x, y: y, d2: d2 });

@@ -43,10 +43,12 @@ function updateBelt() {
       b.popT = (b.popT || 0) + 1;
       if (b.popT === 1) {
         if (typeof sfx !== 'undefined') sfx.pop();
+        var pos = getBeltSlotPos(s);
         if (typeof spawnBurst === 'function') {
-          var pos = getBeltSlotPos(s);
           spawnBurst(pos.x, pos.y, COLORS[b.ci].fill, 14);
         }
+        // Any bucket clear knocks 1 off every active Brick Wall.
+        if (typeof onBucketCleared === 'function') onBucketCleared(pos.x, pos.y);
       }
       if (b.popT >= BUCKET_POP_FRAMES) {
         beltSlots[s] = null;
