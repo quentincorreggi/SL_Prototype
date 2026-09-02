@@ -1,398 +1,4065 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Sand Loop — Prototype</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Sand Loop Belt Lab</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{width:100%;height:100%;overflow:hidden;background:#EDE5D8;
-    font-family:'Fredoka',sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
-  canvas{display:block}
+/* Sand Loop core-gameplay prototype — shell chrome only.
+   Everything inside the play area is drawn on the canvas. */
 
-  /* === Win screen === */
-  #win-screen{position:absolute;inset:0;z-index:100;background:rgba(180,165,145,0.92);
-    display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
-  #win-screen.show{display:flex}
-  #win-screen h1{font-size:48px;color:#8B6914;text-shadow:0 0 30px rgba(139,105,20,0.5),0 4px 0 #6B5010}
-  #win-screen p{color:#5A4A38;font-size:18px}
-  #win-screen button{padding:14px 40px;border-radius:30px;border:none;
-    background:linear-gradient(135deg,#4EE68C,#36C76E);color:white;font-size:20px;
-    font-weight:700;font-family:'Fredoka',sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(78,230,140,0.4)}
+:root {
+  --bg: #14161d;
+  --panel: #1b1e27;
+  --panel-2: #232733;
+  --line: #2e3342;
+  --text: #e8ebf2;
+  --muted: #98a0b3;
+  --accent: #ffb638;
+  --accent-2: #4ec9f5;
+}
 
-  /* === Level select === */
-  #level-screen{position:absolute;inset:0;z-index:90;
-    background:linear-gradient(170deg,#EDE5D8 0%,#E0D4C0 40%,#D4C4AA 100%);
-    display:flex;flex-direction:column;align-items:center;overflow-y:auto}
-  #level-screen.hidden{display:none}
-  .ls-header{width:100%;text-align:center;padding:32px 20px 16px}
-  .ls-title{font-size:38px;font-weight:700;color:#8B6914;text-shadow:0 3px 0 #C4A84D;margin-bottom:4px}
-  .ls-sub{font-size:15px;color:#9C8A70}
-  .ls-actions{display:flex;flex-direction:column;align-items:center;gap:16px;padding:40px 24px 30px;width:100%}
-  .ls-editor-btn{padding:14px 32px;border:none;border-radius:16px;cursor:pointer;
-    font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:white;
-    background:linear-gradient(135deg,#C89CF2,#9060C4);box-shadow:0 6px 22px rgba(144,96,196,0.35);
-    transition:transform 0.18s;display:flex;align-items:center;gap:10px}
-  .ls-editor-btn:hover{transform:scale(1.06)}.ls-editor-btn:active{transform:scale(0.94)}
-  .ls-play-btn{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 6px 22px rgba(78,230,140,0.35)}
-  .ls-streak-btn{background:linear-gradient(135deg,#FFB03A,#F2622E);box-shadow:0 6px 22px rgba(242,98,46,0.35)}
-  .ls-toggle-btn{padding:10px 22px;border:none;border-radius:14px;cursor:pointer;
-    font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:#5A4A38;
-    background:rgba(255,255,255,0.6);box-shadow:0 3px 12px rgba(0,0,0,0.12);opacity:0.62}
-  .ls-toggle-btn:hover{background:rgba(255,255,255,0.85)}
-  .ls-note{max-width:380px;text-align:center;font-size:12px;line-height:1.5;color:#9C8A70;font-style:italic}
+* { box-sizing: border-box; }
 
-  /* === Calibration === */
-  #cal-toggle{position:absolute;top:10px;right:10px;z-index:30;width:40px;height:40px;border-radius:12px;border:none;
-    background:rgba(160,130,100,0.8);color:white;font-size:20px;cursor:pointer;font-family:'Fredoka',sans-serif}
-  #cal-panel{display:none;position:absolute;top:55px;right:10px;z-index:30;
-    background:rgba(240,230,218,0.95);border-radius:14px;padding:12px;
-    box-shadow:0 4px 20px rgba(0,0,0,0.2);width:260px;max-height:80vh;overflow-y:auto;font-family:'Fredoka',sans-serif}
-  #cal-panel h3{font-size:11px;color:#8B6914;margin:8px 0 4px;text-transform:uppercase;letter-spacing:1px}
-  #cal-panel p{font-size:11px;color:#5A4A38}
-  .cal-row{margin:8px 0;display:flex;flex-direction:column;gap:3px}
-  .cal-row label{font-size:12px;color:#5A4A38;font-weight:600;display:flex;justify-content:space-between;align-items:center}
-  .cal-row label .v{background:rgba(123,82,160,0.18);color:#7B52A0;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:700}
-  .cal-row input[type=range]{width:100%;accent-color:#7B52A0}
-  .cal-row .hint{font-size:10px;color:#9C8A70;font-style:italic}
-  .cal-btn{padding:8px 12px;border:none;border-radius:10px;cursor:pointer;font-family:'Fredoka',sans-serif;
-    font-weight:700;font-size:13px;color:#6B4A12;background:linear-gradient(135deg,#FFE08A,#FFB03A)}
-  .cal-btn:hover{filter:brightness(1.06)}.cal-btn:active{transform:scale(0.96)}
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;          /* no pull-to-refresh mid-drag on a phone */
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
 
-  /* === Quit button (visible during gameplay only) === */
-  #quit-btn{display:none;position:absolute;top:10px;left:10px;z-index:30;
-    align-items:center;gap:6px;padding:0 14px;height:40px;border-radius:12px;border:none;
-    background:rgba(160,130,100,0.8);color:white;font-size:14px;font-weight:700;cursor:pointer;
-    font-family:'Fredoka',sans-serif;box-shadow:0 3px 12px rgba(0,0,0,0.15)}
-  #quit-btn:hover{background:rgba(180,140,110,0.9);transform:scale(1.04)}
-  #quit-btn:active{transform:scale(0.95)}
+#app, #stage { user-select: none; -webkit-user-select: none; }
 
-  /* ============================================================
-     EDITOR — full-screen, two-pane layout
-     ============================================================ */
-  #editor-screen{position:absolute;inset:0;z-index:95;display:flex;flex-direction:column;
-    background:linear-gradient(170deg,#E8E0D4 0%,#DDD2C0 40%,#D0C2AA 100%);
-    overflow:hidden;touch-action:auto;user-select:auto;-webkit-user-select:auto}
-  #editor-screen.hidden{display:none}
-  #editor-screen input,#editor-screen textarea{user-select:text;-webkit-user-select:text;touch-action:auto}
+#app { display: flex; height: 100%; }
 
-  .ed-top{display:flex;align-items:center;gap:10px;padding:10px 14px;
-    background:rgba(255,255,255,0.55);border-bottom:1px solid rgba(120,100,80,0.25);
-    flex-shrink:0;flex-wrap:wrap}
-  .ed-back{background:rgba(160,130,100,0.7);border:none;border-radius:10px;width:34px;height:34px;
-    color:white;font-size:18px;cursor:pointer;font-family:'Fredoka',sans-serif;flex-shrink:0}
-  .ed-back:active{transform:scale(0.92)}
-  .ed-top-title{font-size:18px;font-weight:700;color:#7B52A0;flex-shrink:0;margin-right:6px}
-  .ed-top input{padding:7px 10px;border:1.5px solid rgba(160,140,120,0.3);border-radius:8px;
-    background:rgba(255,255,255,0.85);font-family:'Fredoka',sans-serif;font-size:13px;color:#5A4A38;outline:none;
-    min-width:140px;flex:1;max-width:240px}
-  .ed-top input:focus{border-color:rgba(123,82,160,0.5)}
-  .ed-top-actions{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
-  .ed-top-actions .ed-action{padding:8px 16px;font-size:13px;border-radius:10px}
+/* ---------------------------------------------------------------- stage */
 
-  .ed-main{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;
-    overflow:hidden;min-height:0}
-  .ed-pane{background:rgba(255,255,255,0.50);border-radius:14px;border:1px solid rgba(180,165,145,0.3);
-    box-shadow:0 2px 10px rgba(0,0,0,0.05);display:flex;flex-direction:column;min-width:0;min-height:0;
-    overflow:hidden}
-  .ed-pane-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
-    padding:10px 14px 6px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+#stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1d2833;
+}
 
-  /* Left pane: tool sidebar + sand canvas */
-  .ed-left-body{flex:1;display:flex;gap:10px;padding:0 12px 12px;min-height:0;min-width:0}
-  #ed-tool-sidebar{display:flex;flex-direction:column;gap:6px;width:96px;flex-shrink:0;
-    background:rgba(255,255,255,0.55);border-radius:10px;border:1px solid rgba(160,140,120,0.25);
-    padding:8px;overflow-y:auto;max-height:100%}
-  .ed-tool-section-label{font-size:9px;font-weight:700;color:#8B6914;text-transform:uppercase;
-    letter-spacing:0.8px;text-align:center;margin:6px 0 2px;flex-shrink:0}
-  .ed-tool-btn{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;
-    border:2px solid rgba(120,100,80,0.20);background:rgba(255,255,255,0.55);
-    cursor:pointer;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;color:#5A4A38;
-    transition:transform 0.12s,border-color 0.15s,background 0.15s;flex-shrink:0}
-  .ed-tool-btn:hover{transform:translateX(2px);background:rgba(255,255,255,0.85)}
-  .ed-tool-btn.active{background:rgba(123,82,160,0.18);border-color:rgba(123,82,160,0.55);color:#7B52A0}
-  .ed-tool-icon{font-size:14px;width:16px;display:inline-flex;justify-content:center}
-  .ed-size-row{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;flex-shrink:0}
-  .ed-size-btn{aspect-ratio:1;border:2px solid rgba(120,100,80,0.20);border-radius:6px;
-    background:rgba(255,255,255,0.6);cursor:pointer;display:flex;align-items:center;justify-content:center;
-    font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;color:#5A4A38;
-    transition:transform 0.12s,border-color 0.15s}
-  .ed-size-btn:hover{transform:scale(1.05)}
-  .ed-size-btn.active{border-color:rgba(90,60,30,0.85);background:rgba(255,255,255,0.95);
-    box-shadow:0 0 0 2px rgba(139,105,20,0.30)}
-  .ed-size-dot{background:#5A4A38;border-radius:50%}
-  .ed-color-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;flex-shrink:0}
-  .ed-color-grid .ed-tool{width:auto;aspect-ratio:1;height:auto}
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* pointer events drive the controls, never the browser */
+}
 
-  .ed-sand-area{flex:1;display:flex;align-items:center;justify-content:center;
-    min-width:0;min-height:0;overflow:hidden}
-  #ed-sand-grid{display:grid;grid-template-columns:repeat(32,1fr);gap:0;
-    width:100%;max-width:100%;max-height:100%;aspect-ratio:1;
-    background:rgba(120,100,80,0.30);padding:2px;border-radius:8px;
-    user-select:none;-webkit-user-select:none;touch-action:none;cursor:crosshair}
-  .ed-sand-px{aspect-ratio:1;background:#F4ECDB;-webkit-tap-highlight-color:transparent;
-    pointer-events:none;border:0.5px solid rgba(120,100,80,0.08)}
+#panel-toggle {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  z-index: 30;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(27, 30, 39, .85);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+}
+#panel-toggle:hover { background: var(--panel-2); }
+#panel-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  /* Right pane: capacities, toolbar, grid, tunnel panel */
-  .ed-right-body{flex:1;display:flex;flex-direction:column;gap:10px;padding:0 14px 14px;
-    overflow-y:auto;min-height:0}
-  #ed-capacities{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
-  .ed-cap-chip{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;
-    background:rgba(255,255,255,0.6);border:1px solid rgba(160,140,120,0.3);font-size:12px;color:#5A4A38}
-  .ed-cap-chip.warn{background:rgba(220,90,90,0.12);border-color:rgba(220,90,90,0.4);color:#A53030}
-  .ed-cap-chip.dim{opacity:0.7;font-style:italic}
-  .ed-cap-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,0.2)}
-  .ed-cap-info{flex:1;font-weight:600}
+/* ---------------------------------------------------------------- toast */
 
-  #ed-toolbar{display:flex;flex-direction:column;gap:6px;align-items:stretch;flex-shrink:0}
-  .ed-type-row{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
-  .ed-color-row{display:flex;flex-direction:row;gap:4px;flex-wrap:nowrap;overflow-x:auto;
-    justify-content:flex-start;padding:4px 2px;
-    -webkit-overflow-scrolling:touch;scrollbar-width:thin}
-  .ed-color-row::-webkit-scrollbar{height:5px}
-  .ed-color-row::-webkit-scrollbar-thumb{background:rgba(160,140,120,0.45);border-radius:3px}
-  .ed-type-btn{padding:5px 12px;border:2px solid rgba(120,100,80,0.2);border-radius:8px;
-    font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;cursor:pointer;
-    color:#5A4A38;background:rgba(180,165,145,0.25);transition:all 0.15s}
-  .ed-type-btn.active{background:rgba(123,82,160,0.2);border-color:rgba(123,82,160,0.5);color:#7B52A0}
-  .ed-type-btn:hover{transform:scale(1.05)}
-  .ed-tool{width:30px;height:30px;flex-shrink:0;border:2px solid rgba(120,100,80,0.30);border-radius:7px;
-    color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
-    cursor:pointer;transition:transform 0.12s,border-color 0.15s,box-shadow 0.15s;
-    display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px rgba(0,0,0,0.3);
-    padding:0}
-  .ed-tool:hover{transform:scale(1.10)}.ed-tool:active{transform:scale(0.9)}
-  .ed-tool.active{border-color:rgba(90,60,30,0.85);box-shadow:0 0 0 2px rgba(139,105,20,0.35),0 2px 8px rgba(0,0,0,0.15)}
+#toast {
+  position: absolute;
+  left: 50%;
+  bottom: 5%;
+  transform: translate(-50%, 8px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .72);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  letter-spacing: .02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+}
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-  .ed-grid-area{flex-shrink:0;display:flex;justify-content:center}
-  #ed-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;width:100%;max-width:340px}
-  .ed-cell{aspect-ratio:1;border-radius:6px;cursor:pointer;border:2px solid rgba(160,140,120,0.3);
-    display:flex;align-items:center;justify-content:center;transition:transform 0.12s;
-    -webkit-tap-highlight-color:transparent;position:relative}
-  .ed-cell:hover{transform:scale(1.06);z-index:1}.ed-cell:active{transform:scale(0.92)}
-  .ed-cell-dot{font-size:13px;font-weight:700;color:rgba(255,255,255,0.9);text-shadow:0 1px 2px rgba(0,0,0,0.3);pointer-events:none}
-  .ed-tunnel-badge{position:absolute;top:-3px;right:-3px;background:#FFB545;color:#fff;
-    font-size:9px;font-weight:700;min-width:15px;height:15px;border-radius:8px;
-    display:flex;align-items:center;justify-content:center;pointer-events:none;border:1.5px solid #fff}
+/* -------------------------------------------------------------- overlay */
 
-  #ed-tunnel-panel{display:none;background:rgba(61,53,72,0.10);border-radius:12px;padding:10px 12px;
-    border:1.5px solid rgba(106,96,112,0.30);flex-shrink:0}
-  .ed-section-title{font-size:12px;font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:1.2px;
-    margin-bottom:8px;display:flex;align-items:center;gap:6px}
-  .ed-section-title .icon{font-size:15px}
-  .ed-tunnel-dir-row{display:flex;gap:5px;justify-content:center;margin-bottom:6px}
-  .ed-tunnel-dir-btn{padding:5px 14px;border:2px solid rgba(106,96,112,0.3);border-radius:8px;
-    font-family:'Fredoka',sans-serif;font-size:12px;font-weight:600;cursor:pointer;
-    color:#5A4A38;background:rgba(180,165,145,0.25);transition:all 0.15s}
-  .ed-tunnel-dir-btn.active{background:rgba(255,190,80,0.25);border-color:rgba(255,190,80,0.6);color:#B87A20}
-  .ed-tunnel-contents{display:flex;flex-wrap:wrap;gap:4px;min-height:32px;padding:6px;
-    background:rgba(0,0,0,0.04);border-radius:8px;margin-bottom:6px}
-  .ed-tunnel-item{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-    cursor:pointer;color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
-    border:2px solid rgba(255,255,255,0.3);transition:transform 0.12s;text-shadow:0 1px 2px rgba(0,0,0,0.3)}
-  .ed-tunnel-item:hover{transform:scale(1.15);border-color:rgba(255,80,80,0.6)}
-  .ed-tunnel-add-colors{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;margin-bottom:4px}
-  .ed-tunnel-add-clr{width:28px;height:28px;border:2px solid rgba(255,255,255,0.3);border-radius:6px;
-    color:white;font-weight:700;font-size:11px;font-family:'Fredoka',sans-serif;
-    cursor:pointer;transition:transform 0.12s;text-shadow:0 1px 2px rgba(0,0,0,0.2);
-    display:flex;align-items:center;justify-content:center}
-  .ed-tunnel-add-clr:hover{transform:scale(1.15)}
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 17, .72);
+  backdrop-filter: blur(2px);
+}
+#overlay.hidden { display: none; }
 
-  .ed-quick{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;flex-shrink:0}
-  .ed-qbtn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
-    cursor:pointer;color:#5A4A38;background:rgba(180,165,145,0.35);transition:transform 0.12s}
-  .ed-qbtn:hover{background:rgba(180,165,145,0.55);transform:scale(1.05)}
-  .ed-presets{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:center;flex-shrink:0;font-size:11px;color:#5A4A38}
-  .ed-presets-label{font-weight:700;color:#8B6914;text-transform:uppercase;letter-spacing:0.8px;font-size:10px;margin-right:2px}
-  .ed-preset-btn{padding:5px 12px;border:none;border-radius:8px;font-family:'Fredoka',sans-serif;font-size:11px;font-weight:600;
-    cursor:pointer;color:#fff;background:linear-gradient(135deg,#C89CF2,#9060C4);
-    box-shadow:0 2px 6px rgba(144,96,196,0.25);transition:transform 0.12s}
-  .ed-preset-btn:hover{transform:scale(1.06)}
+.overlay-card {
+  text-align: center;
+  padding: 26px 34px;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 3px solid #c9d7e2;
+  color: #33465a;
+  box-shadow: 0 18px 50px rgba(20, 40, 60, .35);
+}
+.overlay-card h2 { margin: 0 0 6px; font-size: 22px; }
+.overlay-card p { margin: 0 0 16px; color: #6d8298; }
 
-  .ed-action{padding:10px 18px;border:none;border-radius:12px;font-family:'Fredoka',sans-serif;font-size:13px;font-weight:700;
-    cursor:pointer;color:white;transition:transform 0.15s}
-  .ed-action:hover{transform:scale(1.05)}.ed-action:active{transform:scale(0.93)}
-  .ed-action.play{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 3px 12px rgba(78,230,140,0.35)}
-  .ed-action.export{background:linear-gradient(135deg,#89CFF0,#5BA3D9);box-shadow:0 3px 12px rgba(91,163,217,0.3)}
-  .ed-action.import{background:linear-gradient(135deg,#E8A84C,#D4903A);box-shadow:0 3px 12px rgba(232,168,76,0.3)}
-  .ed-action.disabled,.ed-action[disabled]{opacity:0.45;cursor:not-allowed;pointer-events:none}
+/* ---------------------------------------------------------------- panel */
 
-  #ed-export-area{display:none;position:absolute;bottom:12px;left:12px;right:12px;
-    height:120px;padding:8px;border:1.5px solid rgba(160,140,120,0.4);border-radius:8px;
-    background:rgba(255,255,255,0.95);font-family:monospace;font-size:11px;color:#5A4A38;
-    resize:vertical;outline:none;z-index:6}
-  #ed-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
-    background:rgba(90,74,56,0.92);color:white;padding:10px 24px;border-radius:12px;
-    font-size:13px;font-weight:600;pointer-events:none;z-index:200;opacity:0;
-    transition:transform 0.35s cubic-bezier(.34,1.56,.64,1),opacity 0.3s}
-  #ed-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#panel {
+  width: 316px;
+  flex: 0 0 316px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 14px 14px 24px;
+}
+#panel.hidden { display: none; }
 
-  /* Narrow screens: stack panes vertically */
-  @media (max-width: 760px) {
-    .ed-main{grid-template-columns:1fr;grid-template-rows:auto auto;overflow-y:auto}
-    .ed-pane{min-height:auto}
-    #ed-tool-sidebar{width:80px}
+#panel header h1 { margin: 0 0 4px; font-size: 15px; letter-spacing: .01em; }
+.hint { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; }
+
+.group {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.group > summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  list-style: none;
+}
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::before { content: "▸ "; color: var(--muted); }
+.group[open] > summary::before { content: "▾ "; }
+.group-body { padding: 4px 10px 10px; }
+
+.field { margin: 7px 0; }
+.field label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.field label .val { color: var(--text); font-variant-numeric: tabular-nums; }
+.field .desc { font-size: 10.5px; color: #6f7789; margin-top: 2px; }
+/* Action fields (e.g. "Fire again") sit full width, like the inputs. */
+.field > button { width: 100%; }
+
+input[type=range] { width: 100%; accent-color: var(--accent); }
+select, input[type=number], input[type=text] {
+  width: 100%;
+  padding: 5px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: #171a22;
+  color: var(--text);
+  font: inherit;
+}
+.field.toggle label { cursor: pointer; align-items: center; }
+input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+
+.row { display: flex; gap: 6px; flex-wrap: wrap; }
+.row.actions { margin: 8px 0 12px; }
+
+button {
+  flex: 1;
+  min-width: 68px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #262b38;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { background: #303646; }
+button.primary { background: var(--accent); color: #23200f; border-color: var(--accent); }
+
+code { background: #171a22; padding: 1px 4px; border-radius: 4px; }
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: .01ms !important; }
+}
+
+/* Phones: the panel is a dismissible sheet over the game, not a column beside
+   it — the play field keeps the whole screen until you open the tools. */
+@media (max-width: 780px) {
+  #panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    flex: none;
+    max-height: 70vh;
+    z-index: 20;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, .45);
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    -webkit-overflow-scrolling: touch;
   }
+  /* Bigger hit targets for thumbs. */
+  button { padding: 11px 12px; }
+  input[type=range] { height: 30px; }
+}
+
 </style>
 </head>
 <body>
-<canvas id="game"></canvas>
+<div id="app">
 
-<button id="quit-btn" onclick="quitGame()">&#10005; Quit</button>
+  <!-- Play area -->
+  <main id="stage">
+    <canvas id="game"></canvas>
 
-<button id="cal-toggle">&#9881;</button>
-<div id="cal-panel">
-  <h3>Debug</h3>
-  <div class="cal-row">
-    <label>Belt speed <span class="v" id="cal-belt-speed-v">7</span></label>
-    <input id="cal-belt-speed" type="range" min="0" max="100" step="1" value="7">
-    <div class="hint">Conveyor scroll speed (0 = paused). 7&nbsp;≈ one slot every 2.4&nbsp;s at 60&nbsp;fps.</div>
-  </div>
-  <div class="cal-row">
-    <label>Bucket radius <span class="v" id="cal-radius-v">2</span></label>
-    <input id="cal-radius" type="range" min="1" max="20" step="1" value="2">
-    <div class="hint">Attraction range, in image pixels. Scales with subdivision so the physical reach stays the same.</div>
-  </div>
-  <div class="cal-row">
-    <label>Pull interval <span class="v" id="cal-pull-v">1</span></label>
-    <input id="cal-pull" type="range" min="1" max="40" step="1" value="1">
-    <div class="hint">Frames between pull cycles. Low&nbsp;=&nbsp;mostly vertical pull. High&nbsp;=&nbsp;long horizontal reach.</div>
-  </div>
-  <div class="cal-row">
-    <label>Grains per cycle <span class="v" id="cal-batch-v">12</span></label>
-    <input id="cal-batch" type="range" min="1" max="20" step="1" value="12">
-    <div class="hint">How many grains the bucket pulls each cycle (nearest first, capped by remaining capacity).</div>
-  </div>
-  <div class="cal-row">
-    <label>Pixel subdivision <span class="v" id="cal-subdiv-v">3&times;3</span></label>
-    <input id="cal-subdiv" type="range" min="1" max="5" step="1" value="3">
-    <div class="hint">Each image pixel becomes an N&times;N block of independent sand particles that fall via the physics. Applied on next game start.</div>
-  </div>
-  <div class="cal-row">
-    <label>Sand CA interval <span class="v" id="cal-sandint-v">2</span></label>
-    <input id="cal-sandint" type="range" min="1" max="10" step="1" value="2">
-    <div class="hint">How often the falling-sand physics ticks (in render frames). 1&nbsp;=&nbsp;every frame (snappiest), higher&nbsp;=&nbsp;slower, heavier feel.</div>
-  </div>
-
-  <h3>Streak Firework</h3>
-  <div class="cal-row">
-    <label>Firework speed <span class="v" id="cal-fw-speed-v">0.35&times;</span></label>
-    <input id="cal-fw-speed" type="range" min="5" max="150" step="5" value="35">
-    <div class="hint">Playback speed of the whole show — rocket, shells, blasts and sparks together. 1.0&times;&nbsp;=&nbsp;full speed, 0.35&times;&nbsp;=&nbsp;slow enough to follow every stage.</div>
-  </div>
-  <div class="cal-row">
-    <label>Shells <span class="v" id="cal-fw-shells-v">2</span></label>
-    <input id="cal-fw-shells" type="range" min="1" max="5" step="1" value="2">
-    <div class="hint">How many smaller fireworks the rocket splits into. Each one destroys one bucket plus the sand it was going to collect.</div>
-  </div>
-  <div class="cal-row">
-    <button class="cal-btn" onclick="replayStreakFirework()">&#127882; Fire again</button>
-    <div class="hint">Replays the show on the current board at the chosen speed. It really does destroy more buckets each time.</div>
-  </div>
-</div>
-
-<div id="level-screen">
-  <div class="ls-header">
-    <div class="ls-title">Sand Loop</div>
-    <div class="ls-sub">Tap an active bucket &middot; it rides the belt and pulls matching sand</div>
-  </div>
-  <div class="ls-actions">
-    <button class="ls-editor-btn ls-streak-btn" onclick="startStreakDemo()"><span style="font-size:22px">&#127882;</span> Streak Split Demo</button>
-    <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
-    <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
-    <button id="streak-btn" class="ls-toggle-btn" onclick="toggleStreakFirework()">&#127882; Streak Boost: OFF</button>
-    <div class="ls-note">Streak boost on = one firework rocket fires at level start, splits in two,
-      and each half destroys a bucket plus the sand it was going to collect.</div>
-  </div>
-</div>
-
-<div id="editor-screen" class="hidden">
-  <div class="ed-top">
-    <button class="ed-back" onclick="editorBack()">&#8592;</button>
-    <div class="ed-top-title">Level Editor</div>
-    <input id="ed-name" type="text" value="Custom Level" maxlength="40" oninput="editorSetName(this.value)" placeholder="Name">
-    <input id="ed-desc" type="text" value="My custom level" maxlength="60" oninput="editorSetDesc(this.value)" placeholder="Description">
-    <div class="ed-top-actions">
-      <button id="ed-streak-btn" class="ed-action" onclick="toggleStreakFirework()" style="opacity:0.62">&#127882; Streak: OFF</button>
-      <button id="ed-test-play" class="ed-action play" onclick="editorTestPlay()">&#9654; Test Play</button>
-      <button class="ed-action export" onclick="editorExportJSON()">&#128203; Export</button>
-      <button class="ed-action import" onclick="editorImportJSON()">&#128229; Import</button>
-    </div>
-  </div>
-
-  <div class="ed-main">
-    <div class="ed-pane ed-left">
-      <div class="ed-pane-title"><span>&#127912;</span> Sand Image (32&times;32)</div>
-      <div class="ed-left-body">
-        <div id="ed-tool-sidebar"></div>
-        <div class="ed-sand-area">
-          <div id="ed-sand-grid"></div>
-        </div>
+    <!-- Floating overlays drawn in DOM (kept out of the canvas so they stay crisp) -->
+    <div id="toast"></div>
+    <div id="overlay" class="hidden">
+      <div class="overlay-card">
+        <h2 id="overlay-title">Level complete</h2>
+        <p id="overlay-sub">All buckets cleared.</p>
+        <button id="overlay-btn" class="primary">Next level</button>
       </div>
     </div>
 
-    <div class="ed-pane ed-right">
-      <div class="ed-pane-title"><span>&#128230;</span> Bucket Grid (7&times;7)</div>
-      <div class="ed-right-body">
-        <div id="ed-capacities"></div>
-        <div id="ed-toolbar"></div>
-        <div class="ed-grid-area"><div id="ed-grid"></div></div>
-        <div class="ed-quick">
-          <button class="ed-qbtn" onclick="edClearAll()">&#129529; Clear All</button>
-          <button class="ed-qbtn" onclick="document.getElementById('ed-png-input').click()">&#128247; Import PNG</button>
-        </div>
-        <div class="ed-presets">
-          <span class="ed-presets-label">Presets</span>
-          <button class="ed-preset-btn" onclick="edLoadPreset(0)">4 colors</button>
-          <button class="ed-preset-btn" onclick="edLoadPreset(1)">5 colors</button>
-          <button class="ed-preset-btn" onclick="edLoadPreset(2)">6 colors</button>
-          <button class="ed-preset-btn" onclick="edLoadPreset(3)">7 colors</button>
-        </div>
-        <input type="file" id="ed-png-input" accept="image/png" style="display:none" onchange="edImportPNG(event)">
-        <div id="ed-tunnel-panel"></div>
-      </div>
+    <button id="panel-toggle" title="Show / hide the tuning panel">⚙</button>
+  </main>
+
+  <!-- Tuning panel: every knob is generated from CONFIG_SCHEMA (js/config.js) -->
+  <aside id="panel">
+    <header>
+      <h1>Core Gameplay Prototype</h1>
+      <p class="hint">Tap a bucket to send it to the belt, or drag it onto a slot to choose where it lands.
+      Release back on the lit cell to call the move off. Try <em>Aim cursor</em> under Controls for the
+      other targeting scheme. With the streak on, a firework fires by itself as the level
+      starts — <em>Fire again</em> (or <kbd>F</kbd>) replays it.</p>
+    </header>
+
+    <div class="row actions">
+      <button id="btn-restart">Restart</button>
+      <button id="btn-new">New level</button>
+      <button id="btn-addslot">+1 slot</button>
     </div>
-  </div>
 
-  <textarea id="ed-export-area"></textarea>
+    <div id="panel-groups"></div>
+
+    <footer>
+      <div class="row actions">
+        <button id="btn-copy">Copy config</button>
+        <button id="btn-save">Save</button>
+        <button id="btn-load">Load</button>
+        <button id="btn-reset">Defaults</button>
+      </div>
+      <p class="hint">Saved locally in this browser. <code>window.SL</code> exposes the live game in the console.</p>
+    </footer>
+  </aside>
+
 </div>
 
-<div id="win-screen">
-  <h1>You Win!</h1>
-  <p id="win-msg">All sand collected!</p>
-  <button onclick="showLevelSelect()">Back</button>
-</div>
-<div id="ed-toast"></div>
+<!-- Classic scripts (no modules) so the prototype also runs straight from file:// -->
 
 <script>
-  function startDemo() {
-    var ls = document.getElementById('level-screen');
-    var ed = document.getElementById('editor-screen');
-    if (ls) ls.classList.add('hidden');
-    if (ed) ed.classList.add('hidden');
-    if (typeof initGame === 'function') initGame();
-    if (typeof ensureAudio === 'function') ensureAudio();
-  }
+/* ---- js/util.js ---- */
+'use strict';
+
+/* Small maths / drawing helpers shared by the whole prototype. */
+
+const Util = {
+
+  clamp(v, a, b) { return v < a ? a : (v > b ? b : v); },
+
+  lerp(a, b, t) { return a + (b - a) * t; },
+
+  invLerp(a, b, v) { return b === a ? 0 : (v - a) / (b - a); },
+
+  /** Clamped remap of v from [a,b] into [c,d]. */
+  remap(a, b, c, d, v) { return Util.lerp(c, d, Util.clamp(Util.invLerp(a, b, v), 0, 1)); },
+
+  dist(ax, ay, bx, by) { const dx = bx - ax, dy = by - ay; return Math.sqrt(dx * dx + dy * dy); },
+
+  /** Positive modulo — JS % keeps the sign of the dividend, which breaks belt wrapping. */
+  mod(v, m) { return ((v % m) + m) % m; },
+
+  easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); },
+  easeInOutCubic(t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; },
+  easeOutBack(t) { const c = 1.70158, c3 = c + 1; return 1 + c3 * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
+  easeOutQuad(t) { return 1 - (1 - t) * (1 - t); },
+
+  /** Catmull-Rom interpolation between p1 and p2, using p0/p3 as tangent anchors. */
+  catmullRom(p0, p1, p2, p3, t) {
+    const t2 = t * t, t3 = t2 * t;
+    return [
+      0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3),
+      0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3),
+    ];
+  },
+
+  /** Deterministic RNG so a seed always rebuilds the same level. */
+  mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+
+  roundRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  },
+
+  /** "#ffaa33" + alpha -> "rgba(...)". Colors in this prototype are always hex. */
+  rgba(hex, alpha) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+  },
+
+  /** Blend two hex colors, t=0 -> a, t=1 -> b. Returns hex so results compose. */
+  mixHex(a, b, t) {
+    const na = parseInt(a.slice(1), 16), nb = parseInt(b.slice(1), 16);
+    const r = Math.round(Util.lerp((na >> 16) & 255, (nb >> 16) & 255, t));
+    const g = Math.round(Util.lerp((na >> 8) & 255, (nb >> 8) & 255, t));
+    const bl = Math.round(Util.lerp(na & 255, nb & 255, t));
+    return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1);
+  },
+
+  /** Deep clone of plain config objects/arrays. */
+  clone(v) { return JSON.parse(JSON.stringify(v)); },
+
+  getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj); },
+
+  setPath(obj, path, value) {
+    const keys = path.split('.');
+    const last = keys.pop();
+    const target = keys.reduce((o, k) => o[k], obj);
+    target[last] = value;
+  },
+};
+
 </script>
 
-<!-- Scripts: order matters -->
-<script src="js/config.js"></script>
-<script src="js/registry.js"></script>
-<script src="js/bucket_default.js"></script>
-<script src="js/bucket_hidden.js"></script>
-<script src="js/calibration.js"></script>
-<script src="js/audio.js"></script>
-<script src="js/particles.js"></script>
-<script src="js/layout.js"></script>
-<script src="js/belt.js"></script>
-<script src="js/sand.js"></script>
-<script src="js/bucket_attraction.js"></script>
-<script src="js/firework.js"></script>
-<script src="js/tunnel.js"></script>
-<script src="js/wall.js"></script>
-<script src="js/rendering.js"></script>
-<script src="js/editor.js"></script>
-<script src="js/game.js"></script>
+<script>
+/* ---- js/config.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   All tunables live here. The panel on the right is generated from
+   CONFIG_SCHEMA, so adding a knob is: add a default + add a schema line.
+   ------------------------------------------------------------------------ */
+
+/** Virtual play-field the canvas is letterboxed into. Belt points are in these units. */
+const WORLD = { w: 640, h: 1200 };
+
+/**
+ * Vertical bands, matching the shipped screen: the sand picture drains into
+ * buckets riding a belt, and the grid of buckets sits underneath.
+ */
+const LAYOUT = {
+  hudTop: 10,
+
+  // Sand picture (the "supply") — a square frame near the top.
+  frameX: 110, frameY: 108, frameW: 420, frameH: 420,
+  frameBorder: 14,
+
+  // Belt band the curve is authored inside.
+  beltTop: 540, beltBottom: 740,
+
+  // "n/5" slot badge under the belt.
+  badgeY: 764,
+
+  boardTop: 792, boardBottom: 1178,
+  boardPadX: 20,
+};
+
+/** Inner sand area of the picture frame. */
+const PICTURE_RECT = {
+  x: LAYOUT.frameX + LAYOUT.frameBorder,
+  y: LAYOUT.frameY + LAYOUT.frameBorder,
+  w: LAYOUT.frameW - LAYOUT.frameBorder * 2,
+  h: LAYOUT.frameH - LAYOUT.frameBorder * 2,
+};
+
+/** Bucket colors, sampled from the shipped art. */
+const PALETTE = [
+  { name: 'red',    hex: '#e13324' },
+  { name: 'yellow', hex: '#ffce1c' },
+  { name: 'orange', hex: '#f7981f' },
+  { name: 'blue',   hex: '#2ba3e3' },
+  { name: 'green',  hex: '#4cbf3c' },
+  { name: 'purple', hex: '#9b5fd0' },
+];
+
+/** Scene colors — the shipped look is bright and pastel, not dark. */
+const SKIN = {
+  skyTop: '#bfdcec',
+  skyMid: '#e6f2f8',
+  skyBottom: '#dbe9f1',
+  frame: '#ffffff',
+  frameEdge: '#c9d7e2',
+  frameShadow: 'rgba(96,124,148,0.22)',
+  pictureEmpty: [111, 111, 111],
+  housing: '#eff4f8',
+  housingEdge: '#c2cfdb',
+  housingDark: '#d3dee7',
+  beltBody: '#97a6b6',
+  beltDark: '#7f8e9f',
+  beltLight: '#b6c3cf',
+  slotHole: '#6f7f90',
+  slotHoleFree: '#7d8d9e',
+  boardSlab: '#93a9bd',
+  boardSlabEdge: '#8a9fb2',
+  cell: '#d7e8f4',
+  cellEdge: '#bdd6e8',
+  ink: '#33465a',
+  inkSoft: '#6d8298',
+  accent: '#ff8a1e',      // predictive feedback
+  accentCool: '#178fd8',  // committed feedback
+  danger: '#e5423a',
+};
+
+const DEFAULT_CONFIG = {
+
+  belt: {
+    shape: 'flat',
+    speed: 52,            // world units per second
+    direction: 1,         // 1 = travels left to right, -1 = right to left
+    slotCount: 5,
+    autoSpacing: true,    // spread slots evenly over the belt, whatever its length
+    slotSpacing: 132,     // manual gap between slots, when autoSpacing is off
+    slotSize: 78,
+    zoneStart: 0.22,      // collect zone, as a fraction of belt length
+    zoneEnd: 0.79,        // defaults line the zone up under the picture
+    boostMultiplier: 2,
+  },
+
+  indicator: {
+    mode: 'both',         // off | predictive | committed | both
+    style: 'ringArrow',   // ring | arrow | ghost | beam | ringArrow | all
+    rule: 'nearestToAnchor',
+    anchor: 0.22,         // path fraction the nearestToAnchor rule measures from
+    stickyMs: 220,        // keep a prediction this long before re-picking (anti-jitter)
+    showPath: true,       // trail along the grid cells the bucket will walk
+    showOrder: false,     // number badges = order the free slots come up
+    dimUnreachable: false,
+  },
+
+  controls: {
+    mode: 'hybrid',       // tap | drag | hybrid | aim
+    dragThreshold: 10,    // px of movement before a press becomes a drag
+    dragSnap: 150,        // world units: how close the pointer must be to a slot
+    dragFallbackAuto: true,   // releasing on nothing still sends the bucket (auto pick)
+    holdToBoost: true,    // press and hold empty space to speed the belt up
+    cancelOnOrigin: true, // drop back on the cell you took it from to call the move off
+    dimBoard: true,       // dim the board mid-gesture so the origin cell reads
+    dimAmount: 0.45,
+    aimArc: 120,          // height of the aim-mode trajectory arc
+  },
+
+  motion: {
+    cellTime: 0.07,       // seconds per grid cell while walking to the exit
+    jumpTime: 0.34,       // hop from the board onto the (moving) slot
+    jumpArc: 90,          // height of that hop
+    fillRate: 0.5,        // fill fraction per second
+    fillOnlyInZone: false, // extra gate on top of the collect radius
+    byeDelay: 0.12,       // hold at 100% before the bucket pops
+    popTime: 0.45,
+  },
+
+  sand: {
+    collectRadius: 260,   // a bucket only reaches sand within this of itself
+    resolution: 46,       // picture is resolution x resolution grains
+    settleSteps: 3,       // slump passes per frame after grains are removed
+    grainTime: 0.3,       // flight time of a grain from the picture to the bucket
+  },
+
+  level: {
+    cols: 5,
+    rows: 5,
+    colors: 3,
+    density: 0.6,         // share of free cells that get a bucket
+    wallChance: 0.12,
+    seed: 4271,
+  },
+
+  /**
+   * Streak reward — a core/meta perk, not a level piece. When the streak is
+   * active as the level starts, one rocket auto-launches, splits into
+   * `shells` smaller fireworks, and each one destroys a bucket on the board
+   * plus exactly the grains that bucket was going to collect.
+   */
+  firework: {
+    enabled: true,
+    shells: 2,
+    speed: 0.35,          // playback speed of the whole show (1 = full speed)
+    launchDelay: 0.6,     // seconds after the level appears
+    aimMiddle: true,      // skip the player's first moves, aim at the middle rows
+  },
+
+  debug: {
+    showSpline: false,
+    showZone: false,
+    showReach: false,
+    showCollectRadius: true,
+    editBelt: false,
+    showStats: true,
+  },
+};
+
+/** Live config. Mutated by the panel; read every frame. */
+const CONFIG = Util.clone(DEFAULT_CONFIG);
+
+/* ------------------------------------------------------------------------
+   Panel schema.
+   apply: what to rebuild when the value changes — 'belt', 'slots' or 'level'.
+   ------------------------------------------------------------------------ */
+
+const CONFIG_SCHEMA = [
+  {
+    id: 'belt', label: 'Conveyor belt', open: true, fields: [
+      { k: 'belt.shape', label: 'Shape', type: 'select', options: () => BELT_SHAPE_OPTIONS, apply: 'belt',
+        desc: 'Preset curve. Turn on Debug ▸ Edit belt to drag the control points.' },
+      { k: 'belt.speed', label: 'Speed', type: 'range', min: 0, max: 180, step: 1, unit: ' u/s' },
+      { k: 'belt.direction', label: 'Direction', type: 'select',
+        options: [{ v: 1, label: 'Forward →' }, { v: -1, label: 'Reverse ←' }], cast: Number },
+      { k: 'belt.slotCount', label: 'Slots', type: 'range', min: 1, max: 9, step: 1, apply: 'slots' },
+      { k: 'belt.autoSpacing', label: 'Spread slots evenly', type: 'toggle', apply: 'slots',
+        desc: 'On: the gap is the belt length divided by the slot count, so any shape works.' },
+      { k: 'belt.slotSpacing', label: 'Manual slot spacing', type: 'range', min: 60, max: 400, step: 2, apply: 'slots',
+        desc: 'Only used when the toggle above is off. Clamped so slots cannot overlap.' },
+      { k: 'belt.slotSize', label: 'Slot size', type: 'range', min: 44, max: 110, step: 1 },
+      { k: 'belt.zoneStart', label: 'Collect zone start', type: 'range', min: 0, max: 1, step: 0.01 },
+      { k: 'belt.zoneEnd', label: 'Collect zone end', type: 'range', min: 0, max: 1, step: 0.01,
+        desc: 'Where a full bucket is allowed to pop (the shipped canJumpIn trigger). Filling is decided by the collection radius, not by this.' },
+      { k: 'belt.boostMultiplier', label: 'Boost multiplier', type: 'range', min: 1, max: 4, step: 0.1 },
+    ]
+  },
+  {
+    id: 'indicator', label: 'Landing feedback', open: true, fields: [
+      { k: 'indicator.mode', label: 'When to show', type: 'select', options: [
+        { v: 'off', label: 'Off' },
+        { v: 'predictive', label: 'Predictive (before tap)' },
+        { v: 'committed', label: 'Committed (after tap)' },
+        { v: 'both', label: 'Both' },
+      ], desc: 'Predictive re-runs the picker every frame, so it hops as the belt moves.' },
+      { k: 'indicator.style', label: 'Style', type: 'select', options: [
+        { v: 'ring', label: 'Ring' },
+        { v: 'arrow', label: 'Arrow' },
+        { v: 'ghost', label: 'Ghost bucket' },
+        { v: 'beam', label: 'Beam from bucket' },
+        { v: 'ringArrow', label: 'Ring + arrow' },
+        { v: 'all', label: 'Everything' },
+      ] },
+      { k: 'indicator.rule', label: 'Slot picker', type: 'select', options: [
+        { v: 'nearestToAnchor', label: 'Nearest to anchor (shipped)' },
+        { v: 'firstInTravel', label: 'First to reach the zone' },
+        { v: 'lastInTravel', label: 'Last to reach the zone' },
+        { v: 'nearestToExit', label: 'Nearest to board exit' },
+      ], desc: 'The shipped game picks the free slot nearest a fixed anchor transform.' },
+      { k: 'indicator.anchor', label: 'Anchor position', type: 'range', min: 0, max: 1, step: 0.01 },
+      { k: 'indicator.stickyMs', label: 'Prediction stickiness', type: 'range', min: 0, max: 1200, step: 10, unit: ' ms',
+        desc: 'Hold a prediction this long before re-picking. 0 = raw, jumpy.' },
+      { k: 'indicator.showPath', label: 'Show grid path', type: 'toggle' },
+      { k: 'indicator.showOrder', label: 'Number the free slots', type: 'toggle' },
+      { k: 'indicator.dimUnreachable', label: 'Grey out blocked buckets', type: 'toggle',
+        desc: 'Off by default: the shipped board keeps queued buckets at full colour.' },
+    ]
+  },
+  {
+    id: 'controls', label: 'Controls', open: true, fields: [
+      { k: 'controls.mode', label: 'Input mode', type: 'select', options: [
+        { v: 'tap', label: 'Tap only (shipped)' },
+        { v: 'drag', label: 'Drag and drop only' },
+        { v: 'hybrid', label: 'Hybrid — tap or drag' },
+        { v: 'aim', label: 'Aim cursor — bucket stays put' },
+      ], desc: 'Aim mode keeps the bucket on the board and gives you a targeting cursor with a trajectory instead.' },
+      { k: 'controls.dragThreshold', label: 'Drag threshold', type: 'range', min: 2, max: 40, step: 1 },
+      { k: 'controls.dragSnap', label: 'Drop snap radius', type: 'range', min: 40, max: 300, step: 5 },
+      { k: 'controls.dragFallbackAuto', label: 'Drop on nothing = auto pick', type: 'toggle' },
+      { k: 'controls.cancelOnOrigin', label: 'Drop back on origin = cancel', type: 'toggle',
+        desc: 'The cell you took the bucket from stays lit; release over it to call the move off.' },
+      { k: 'controls.dimBoard', label: 'Dim the board while aiming', type: 'toggle' },
+      { k: 'controls.dimAmount', label: 'Dim strength', type: 'range', min: 0, max: 0.8, step: 0.05 },
+      { k: 'controls.aimArc', label: 'Aim trajectory arc', type: 'range', min: 0, max: 300, step: 5 },
+      { k: 'controls.holdToBoost', label: 'Hold to speed up belt', type: 'toggle' },
+    ]
+  },
+  {
+    id: 'firework', label: 'Streak firework', open: true, fields: [
+      { k: 'firework.enabled', label: 'Streak active', type: 'toggle',
+        desc: 'The reward the player brings into the level. On = a rocket fires by itself as the level starts, splits in two, and each half clears one bucket and the sand it was going to collect.' },
+      { k: 'firework.shells', label: 'Shells', type: 'range', min: 1, max: 5, step: 1,
+        desc: 'How many smaller fireworks the rocket splits into. One bucket each.' },
+      { k: 'firework.speed', label: 'Playback speed', type: 'range', min: 0.05, max: 1.5, step: 0.05, unit: '×',
+        desc: 'Slows the whole show down — rocket, shells, blasts and sparks together. 0.35× is slow enough to follow every stage.' },
+      { k: 'firework.launchDelay', label: 'Fires after level start', type: 'range', min: 0, max: 3, step: 0.1, unit: ' s' },
+      { k: 'firework.aimMiddle', label: 'Aim at the middle of the level', type: 'toggle',
+        desc: 'Skips the buckets you could tap right now and the front row, so the reward bites into the middle rows instead of your first moves.' },
+      { type: 'button', label: '🎆 Fire again', hook: 'onFirework',
+        desc: 'Replays the show on the board as it stands, at the chosen speed. It really does destroy more buckets each time.' },
+    ]
+  },
+  {
+    id: 'motion', label: 'Motion & fill', fields: [
+      { k: 'motion.cellTime', label: 'Walk time per cell', type: 'range', min: 0.01, max: 0.3, step: 0.005, unit: ' s' },
+      { k: 'motion.jumpTime', label: 'Hop onto slot', type: 'range', min: 0.05, max: 1, step: 0.01, unit: ' s' },
+      { k: 'motion.jumpArc', label: 'Hop arc height', type: 'range', min: 0, max: 240, step: 2 },
+      { k: 'motion.fillRate', label: 'Fill rate', type: 'range', min: 0.05, max: 2, step: 0.01, unit: ' /s' },
+      { k: 'motion.fillOnlyInZone', label: 'Also gate fill on the collect zone', type: 'toggle',
+        desc: 'The radius normally does the gating; the zone still decides where a full bucket may pop.' },
+      { k: 'motion.byeDelay', label: 'Hold at 100%', type: 'range', min: 0, max: 1, step: 0.01, unit: ' s' },
+      { k: 'motion.popTime', label: 'Pop out', type: 'range', min: 0.1, max: 1.2, step: 0.01, unit: ' s' },
+    ]
+  },
+  {
+    id: 'sand', label: 'Sand picture', fields: [
+      { k: 'sand.collectRadius', label: 'Collection radius', type: 'range', min: 40, max: 520, step: 5,
+        desc: 'A bucket only drains grains within this distance of itself, so where it sits on the belt decides what it can take.' },
+      { k: 'sand.resolution', label: 'Grain resolution', type: 'range', min: 16, max: 80, step: 2, apply: 'level',
+        desc: 'Grid of grains in the frame. The picture is the supply: it is split across the buckets exactly.' },
+      { k: 'sand.settleSteps', label: 'Slump passes / frame', type: 'range', min: 0, max: 8, step: 1,
+        desc: '0 freezes the picture — holes stay where they are cut.' },
+      { k: 'sand.grainTime', label: 'Grain flight time', type: 'range', min: 0.05, max: 1, step: 0.01, unit: ' s' },
+    ]
+  },
+  {
+    id: 'level', label: 'Level', fields: [
+      { k: 'level.cols', label: 'Columns', type: 'range', min: 3, max: 10, step: 1, apply: 'level' },
+      { k: 'level.rows', label: 'Rows', type: 'range', min: 3, max: 11, step: 1, apply: 'level' },
+      { k: 'level.colors', label: 'Colors', type: 'range', min: 1, max: 6, step: 1, apply: 'level' },
+      { k: 'level.density', label: 'Bucket density', type: 'range', min: 0.1, max: 1, step: 0.01, apply: 'level' },
+      { k: 'level.wallChance', label: 'Wall chance', type: 'range', min: 0, max: 0.35, step: 0.01, apply: 'level' },
+      { k: 'level.seed', label: 'Seed', type: 'number', apply: 'level' },
+    ]
+  },
+  {
+    id: 'debug', label: 'Debug', fields: [
+      { k: 'debug.showZone', label: 'Highlight collect zone', type: 'toggle' },
+      { k: 'debug.showSpline', label: 'Show belt spline', type: 'toggle' },
+      { k: 'debug.editBelt', label: 'Edit belt points', type: 'toggle',
+        desc: 'Drag the control points on the canvas. Copy config to keep the shape.' },
+      { k: 'debug.showCollectRadius', label: 'Show collection radius', type: 'toggle' },
+      { k: 'debug.showReach', label: 'Show reachable cells', type: 'toggle' },
+      { k: 'debug.showStats', label: 'Show stats', type: 'toggle' },
+    ]
+  },
+];
+
+const CONFIG_STORAGE_KEY = 'sandloop.proto.config.v3';
+
+</script>
+
+<script>
+/* ---- js/picture.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   The sand picture — the supply the buckets drain.
+
+   A grid of coloured grains inside the frame. Grains fall and slump into
+   holes, so pulling sand out of the bottom of a colour carves a funnel and
+   the picture above it collapses inwards, exactly as in the shipped game.
+
+   The picture is also the ledger: its grain count per colour is split across
+   the buckets demanding that colour (even share, remainder to the last one),
+   mirroring SlotsController's `size` / `offsetSize` split.
+   ------------------------------------------------------------------------ */
+
+class SandPicture {
+
+  constructor(cols, rows) {
+    this.cols = cols;
+    this.rows = rows;
+    this.cells = new Int16Array(cols * rows).fill(-1);   // colour index, -1 = empty
+    this.jitter = new Float32Array(cols * rows);         // per-grain shade noise
+    this.counts = new Map();
+
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = cols;
+    this.canvas.height = rows;
+    this.ctx = this.canvas.getContext('2d');
+    this.imageData = this.ctx.createImageData(cols, rows);
+    this.dirty = true;
+  }
+
+  /* ------------------------------------------------------------ generate */
+
+  /**
+   * Fill the frame with organic colour regions whose grain counts are exactly
+   * proportional to demand.
+   * @param {Map<number, number>} demand colour index -> number of buckets wanting it
+   * @returns {Map<number, number>} colour index -> grains supplied
+   */
+  generate(demand, rng) {
+    const total = this.cols * this.rows;
+    const entries = [...demand.entries()].filter(([, n]) => n > 0);
+    if (!entries.length) return new Map();
+
+    const totalBuckets = entries.reduce((s, [, n]) => s + n, 0);
+    const budget = entries.map(([color, n]) => [color, Math.floor(total * n / totalBuckets)]);
+    const short = total - budget.reduce((s, [, n]) => s + n, 0);
+    budget[budget.length - 1][1] += short;   // remainder lands on the last colour
+
+    // A smooth field sorted into bands gives contiguous blobs with exact counts.
+    const phase = () => rng() * Math.PI * 2;
+    const a1 = rng() * 0.28 + 0.04, b1 = rng() * 0.28 + 0.04, p1 = phase();
+    const a2 = rng() * 0.22 + 0.03, b2 = rng() * 0.22 + 0.03, p2 = phase();
+    const a3 = rng() * 0.18 + 0.02, p3 = phase();
+
+    const value = new Float32Array(total);
+    const order = new Int32Array(total);
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const i = r * this.cols + c;
+        value[i] = Math.sin(a1 * c + b1 * r + p1)
+          + 0.7 * Math.sin(a2 * c - b2 * r + p2)
+          + 0.5 * Math.sin(a3 * r + p3)
+          + rng() * 0.3;
+        order[i] = i;
+        this.jitter[i] = rng();
+      }
+    }
+    const sorted = Array.from(order).sort((x, y) => value[x] - value[y]);
+
+    let k = 0;
+    for (const [color, n] of budget) {
+      for (let j = 0; j < n; j++) this.cells[sorted[k++]] = color;
+    }
+
+    this.counts = new Map(budget);
+    this.dirty = true;
+    return new Map(budget);
+  }
+
+  /* -------------------------------------------------------------- access */
+
+  countOf(color) { return this.counts.get(color) || 0; }
+
+  /**
+   * The grain a bucket can actually take: the LOWEST grain of its colour
+   * inside a radius centred on the bucket, and within that row the one
+   * closest to it horizontally.
+   *
+   * A bucket therefore only drains the sand it is physically under, which is
+   * what carves a funnel above it and what makes belt shape and belt position
+   * matter. Returns -1 when nothing of that colour is in reach.
+   */
+  lowestIndexNear(color, wx, wy, radius) {
+    const cw = PICTURE_RECT.w / this.cols;
+    const ch = PICTURE_RECT.h / this.rows;
+    const r2 = radius * radius;
+
+    const c0 = Math.max(0, Math.floor((wx - radius - PICTURE_RECT.x) / cw));
+    const c1 = Math.min(this.cols - 1, Math.ceil((wx + radius - PICTURE_RECT.x) / cw));
+    const r0 = Math.max(0, Math.floor((wy - radius - PICTURE_RECT.y) / ch));
+    const r1 = Math.min(this.rows - 1, Math.ceil((wy + radius - PICTURE_RECT.y) / ch));
+    if (c1 < c0 || r1 < r0) return -1;
+
+    for (let r = r1; r >= r0; r--) {
+      const gy = PICTURE_RECT.y + (r + 0.5) * ch;
+      const dy = gy - wy;
+      const rest = r2 - dy * dy;
+      if (rest <= 0) continue;
+      const base = r * this.cols;
+      let best = -1, bestDx = Infinity;
+      for (let c = c0; c <= c1; c++) {
+        if (this.cells[base + c] !== color) continue;
+        const gx = PICTURE_RECT.x + (c + 0.5) * cw;
+        const dx = gx - wx;
+        if (dx * dx > rest) continue;
+        const adx = Math.abs(dx);
+        if (adx < bestDx) { bestDx = adx; best = base + c; }
+      }
+      if (best >= 0) return best;
+    }
+    return -1;
+  }
+
+  /** Remove one grain and report its grid position. */
+  take(index) {
+    const color = this.cells[index];
+    if (color < 0) return null;
+    this.cells[index] = -1;
+    this.counts.set(color, Math.max(0, (this.counts.get(color) || 1) - 1));
+    this.dirty = true;
+    return { col: index % this.cols, row: (index / this.cols) | 0, color };
+  }
+
+  /** World position of a grid cell inside the frame. */
+  worldOf(col, row) {
+    return {
+      x: PICTURE_RECT.x + (col + 0.5) * PICTURE_RECT.w / this.cols,
+      y: PICTURE_RECT.y + (row + 0.5) * PICTURE_RECT.h / this.rows,
+    };
+  }
+
+  /* --------------------------------------------------------------- slump */
+
+  /**
+   * One gravity pass: every grain drops straight down, or slides diagonally
+   * if the cell below is taken. Scanning bottom-up means a grain moves at
+   * most one row per pass, which is what makes the collapse look like sand
+   * rather than a curtain.
+   */
+  settle(passes) {
+    const { cols, rows, cells } = this;
+    for (let pass = 0; pass < passes; pass++) {
+      let moved = false;
+      for (let r = rows - 2; r >= 0; r--) {
+        const base = r * cols;
+        for (let c = 0; c < cols; c++) {
+          const i = base + c;
+          const color = cells[i];
+          if (color < 0) continue;
+
+          const below = i + cols;
+          if (cells[below] < 0) {
+            cells[below] = color; cells[i] = -1; moved = true;
+            continue;
+          }
+          // Deterministic left/right preference so the slump is reproducible.
+          const preferLeft = this.jitter[i] < 0.5;
+          const first = preferLeft ? (c > 0 ? below - 1 : -1) : (c < cols - 1 ? below + 1 : -1);
+          const second = preferLeft ? (c < cols - 1 ? below + 1 : -1) : (c > 0 ? below - 1 : -1);
+          const target = (first >= 0 && cells[first] < 0) ? first
+            : ((second >= 0 && cells[second] < 0) ? second : -1);
+          if (target >= 0) {
+            cells[target] = color; cells[i] = -1; moved = true;
+          }
+        }
+      }
+      if (moved) this.dirty = true; else break;
+    }
+  }
+
+  /* ------------------------------------------------------------- raster */
+
+  /** Rebuild the offscreen bitmap. Drawn scaled up with smoothing off. */
+  repaint() {
+    if (!this.dirty) return;
+    const data = this.imageData.data;
+    const empty = SKIN.pictureEmpty;
+
+    for (let i = 0; i < this.cells.length; i++) {
+      const color = this.cells[i];
+      const o = i * 4;
+      if (color < 0) {
+        data[o] = empty[0]; data[o + 1] = empty[1]; data[o + 2] = empty[2];
+      } else {
+        const rgb = SandPicture.rgbOf(color);
+        const shade = 1 + (this.jitter[i] - 0.5) * 0.26;
+        data[o] = Util.clamp(rgb[0] * shade, 0, 255);
+        data[o + 1] = Util.clamp(rgb[1] * shade, 0, 255);
+        data[o + 2] = Util.clamp(rgb[2] * shade, 0, 255);
+      }
+      data[o + 3] = 255;
+    }
+    this.ctx.putImageData(this.imageData, 0, 0);
+    this.dirty = false;
+  }
+
+  /** Cached palette lookup in raw RGB. */
+  static rgbOf(color) {
+    if (!SandPicture._rgb) {
+      SandPicture._rgb = PALETTE.map(p => {
+        const n = parseInt(p.hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      });
+    }
+    return SandPicture._rgb[color % SandPicture._rgb.length];
+  }
+}
+
+</script>
+
+<script>
+/* ---- js/belt.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   The conveyor belt.
+
+   A belt is a curve (Catmull-Rom through control points) plus N slots that
+   ride along it at a fixed arc-length spacing.
+
+   An OPEN belt has a portal at each end: a slot that reaches the exit portal
+   reappears out of the entry portal, which is the shipped recycling rule. The
+   portals sit exactly on the path's endpoints, so the curve between them can
+   be any shape at all — including a U that wraps around the sand picture.
+
+   A CLOSED belt (the oval) has no portals; slots just go round.
+   ------------------------------------------------------------------------ */
+
+/** Control points are authored in WORLD units. Endpoints = portal positions. */
+const BELT_SHAPES = {
+  flat: {
+    label: 'Flat (shipped)', closed: false,
+    points: [[44, 640], [190, 640], [320, 640], [450, 640], [596, 640]],
+  },
+  hill: {
+    label: 'Hill', closed: false,
+    points: [[44, 692], [170, 650], [320, 616], [470, 650], [596, 692]],
+  },
+  arch: {
+    label: 'Steep arch', closed: false,
+    points: [[44, 718], [150, 652], [320, 578], [490, 652], [596, 718]],
+  },
+  valley: {
+    label: 'Valley', closed: false,
+    points: [[44, 580], [170, 642], [320, 702], [470, 642], [596, 580]],
+  },
+  wave: {
+    label: 'Wave (S)', closed: false,
+    points: [[44, 692], [170, 600], [320, 650], [470, 600], [596, 692]],
+  },
+  slope: {
+    label: 'Slope', closed: false,
+    points: [[44, 716], [200, 674], [430, 620], [596, 582]],
+  },
+  uPicture: {
+    label: 'U around the picture', closed: false,
+    points: [[70, 214], [62, 432], [118, 608], [320, 664], [522, 608],
+             [578, 432], [570, 214]],
+  },
+  cradle: {
+    label: 'Deep cradle', closed: false,
+    points: [[62, 320], [56, 566], [182, 692], [320, 714], [458, 692],
+             [584, 566], [578, 320]],
+  },
+  oval: {
+    label: 'Oval loop (no portals)', closed: true,
+    points: [[320, 562], [520, 576], [604, 640], [520, 704], [320, 718],
+             [120, 704], [36, 640], [120, 576]],
+  },
+};
+
+const BELT_SHAPE_OPTIONS = Object.keys(BELT_SHAPES)
+  .map(k => ({ v: k, label: BELT_SHAPES[k].label }));
+
+/* ------------------------------------------------------------------ path */
+
+class BeltPath {
+
+  constructor(points, closed) { this.set(points, closed); }
+
+  /** Rebuild the sampled polyline + arc-length table from control points. */
+  set(points, closed) {
+    this.points = points.map(p => [p[0], p[1]]);
+    this.closed = !!closed;
+    this.build();
+  }
+
+  /** Control-point index, wrapping for closed curves and clamping for open ones. */
+  idx(i) {
+    const n = this.points.length;
+    if (this.closed) return Util.mod(i, n);
+    return Util.clamp(i, 0, n - 1);
+  }
+
+  build() {
+    const SUB = 22;
+    const n = this.points.length;
+    const segs = this.closed ? n : n - 1;
+    const pts = [];
+    for (let i = 0; i < segs; i++) {
+      const p0 = this.points[this.idx(i - 1)];
+      const p1 = this.points[this.idx(i)];
+      const p2 = this.points[this.idx(i + 1)];
+      const p3 = this.points[this.idx(i + 2)];
+      for (let j = 0; j < SUB; j++) pts.push(Util.catmullRom(p0, p1, p2, p3, j / SUB));
+    }
+    pts.push(this.closed ? pts[0].slice() : this.points[n - 1].slice());
+
+    // Cumulative arc length, so a slot can be addressed by distance along the belt.
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      cum[i] = cum[i - 1] + Util.dist(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+    }
+    this.samples = pts;
+    this.cum = cum;
+    this.length = cum[cum.length - 1];
+  }
+
+  /** Position + tangent angle at arc length s (wraps in both directions). */
+  posAt(s) {
+    const L = this.length;
+    s = Util.mod(s, L);
+    const cum = this.cum;
+    let lo = 0, hi = cum.length - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (cum[mid] <= s) lo = mid; else hi = mid;
+    }
+    const a = this.samples[lo], b = this.samples[hi];
+    const t = Util.invLerp(cum[lo], cum[hi], s);
+    return {
+      x: Util.lerp(a[0], b[0], t),
+      y: Util.lerp(a[1], b[1], t),
+      angle: Math.atan2(b[1] - a[1], b[0] - a[0]),
+    };
+  }
+
+}
+
+/* ------------------------------------------------------------------ slot */
+
+class Slot {
+
+  constructor(id, baseS) {
+    this.id = id;
+    this.baseS = baseS;    // spacing offset; the belt adds a shared scroll on top
+    this.s = baseS;
+    this.x = 0; this.y = 0; this.angle = 0;
+    this.bucket = null;    // bucket that has landed
+    this.reserved = null;  // bucket that is on its way (slot is taken)
+    this.inZone = false;
+    this.warn = 0;         // 0..1 warning pulse, mirrors PlayWarningAnim
+    this.entering = 1;     // 0..1 spawn animation for bought slots
+  }
+
+  /** A slot is unavailable as soon as it is reserved — the shipped AwaitBasket() rule. */
+  get isFree() { return !this.bucket && !this.reserved; }
+}
+
+/* ------------------------------------------------------------------ belt */
+
+class Belt {
+
+  constructor() {
+    this.slots = [];
+    this.scroll = 0;
+    this.boost = false;
+    // A restored config may carry hand-edited points; only fall back to the
+    // preset when there are none.
+    if (!CONFIG.belt.points) {
+      const shape = BELT_SHAPES[CONFIG.belt.shape] || BELT_SHAPES.hill;
+      CONFIG.belt.points = Util.clone(shape.points);
+      CONFIG.belt.closed = shape.closed;
+    }
+    this.path = new BeltPath(CONFIG.belt.points, CONFIG.belt.closed);
+    this.rebuildSlots();
+  }
+
+  /** Current speed multiplier — the whole game scales with it, like GameClock.M. */
+  get speedMul() { return this.boost ? CONFIG.belt.boostMultiplier : 1; }
+
+  setShape(name) {
+    const shape = BELT_SHAPES[name] || BELT_SHAPES.hill;
+    CONFIG.belt.points = Util.clone(shape.points);
+    CONFIG.belt.closed = shape.closed;
+    this.path.set(CONFIG.belt.points, shape.closed);
+  }
+
+  /** Re-sample after a control point was dragged; slots re-space to the new length. */
+  refreshPath() {
+    this.path.set(CONFIG.belt.points, CONFIG.belt.closed);
+    this.rebuildSlots();
+  }
+
+  /**
+   * Gap between slots. Auto spacing spreads them evenly over the whole belt,
+   * which is what keeps a shape change from piling slots on top of each other
+   * — a manual spacing is clamped for the same reason.
+   */
+  spacing() {
+    const even = this.path.length / Math.max(1, CONFIG.belt.slotCount);
+    if (CONFIG.belt.autoSpacing) return even;
+    return Math.min(CONFIG.belt.slotSpacing, even);
+  }
+
+  /** (Re)create the slot ring. Existing occupants are dropped — restart-level only. */
+  rebuildSlots() {
+    const n = CONFIG.belt.slotCount;
+    const spacing = this.spacing();
+    const slots = [];
+    for (let i = 0; i < n; i++) {
+      const slot = this.slots[i] || new Slot(i, 0);
+      slot.id = i;
+      slot.baseS = i * spacing;
+      slots.push(slot);
+    }
+    this.slots = slots;
+    this.updateSlotTransforms();
+  }
+
+  /** Buying a slot appends one more, entering with a little pop. */
+  addSlot() {
+    if (CONFIG.belt.slotCount >= 9) return false;
+    CONFIG.belt.slotCount++;
+    const slot = new Slot(this.slots.length, this.slots.length * this.spacing());
+    slot.entering = 0;
+    this.slots.push(slot);
+    this.rebuildSlots();
+    return true;
+  }
+
+  update(dt) {
+    this.scroll += CONFIG.belt.speed * this.speedMul * dt * Math.sign(CONFIG.belt.direction || 1);
+    this.scroll = Util.mod(this.scroll, this.path.length);
+    this.updateSlotTransforms();
+    for (const slot of this.slots) {
+      if (slot.entering < 1) slot.entering = Util.clamp(slot.entering + dt * 2.5, 0, 1);
+    }
+  }
+
+  updateSlotTransforms() {
+    const L = this.path.length;
+    const zs = Math.min(CONFIG.belt.zoneStart, CONFIG.belt.zoneEnd);
+    const ze = Math.max(CONFIG.belt.zoneStart, CONFIG.belt.zoneEnd);
+    for (const slot of this.slots) {
+      slot.s = Util.mod(slot.baseS + this.scroll, L);
+      const p = this.path.posAt(slot.s);
+      slot.x = p.x; slot.y = p.y; slot.angle = p.angle;
+      const f = slot.s / L;
+      slot.inZone = f >= zs && f <= ze;
+    }
+  }
+
+  /** Where a bucket sits on a slot — offset along the belt's up-normal. */
+  seat(slot) {
+    const nx = Math.sin(slot.angle), ny = -Math.cos(slot.angle);
+    const off = CONFIG.belt.slotSize * 0.3;
+    return { x: slot.x + nx * off, y: slot.y + ny * off };
+  }
+
+  /**
+   * The two portals of an open belt, sitting on the path's endpoints. Which
+   * one is the exit depends on the travel direction. Closed loops return null.
+   */
+  portals() {
+    if (CONFIG.belt.closed) return null;
+    const L = this.path.length;
+    const forward = Math.sign(CONFIG.belt.direction || 1) >= 0;
+    const start = this.path.posAt(0);
+    // posAt wraps, so ask for a hair before the end to get the far endpoint.
+    const end = this.path.posAt(L - 0.01);
+    return [
+      { x: start.x, y: start.y, angle: start.angle, kind: forward ? 'entry' : 'exit' },
+      { x: end.x, y: end.y, angle: end.angle, kind: forward ? 'exit' : 'entry' },
+    ];
+  }
+
+  /**
+   * How visible a slot is near a portal, so the recycle reads as sliding into
+   * a tunnel rather than teleporting. 1 in the open belt, 0 inside a portal.
+   */
+  portalAlpha(s) {
+    if (CONFIG.belt.closed) return 1;
+    const fade = Math.max(1, CONFIG.belt.slotSize * 0.6);
+    const L = this.path.length;
+    return Util.clamp(Math.min(s, L - s) / fade, 0, 1);
+  }
+
+  /** Point the "nearest to anchor" picker measures from (the shipped m_StartPos). */
+  anchorPoint() { return this.path.posAt(CONFIG.indicator.anchor * this.path.length); }
+
+  /** Distance a slot still has to travel before it reaches the anchor. */
+  distanceToAnchor(slot) {
+    const L = this.path.length;
+    const target = CONFIG.indicator.anchor * L;
+    const dir = Math.sign(CONFIG.belt.direction || 1);
+    return dir >= 0 ? Util.mod(target - slot.s, L) : Util.mod(slot.s - target, L);
+  }
+
+  freeSlots() { return this.slots.filter(s => s.isFree); }
+
+  occupiedCount() { return this.slots.filter(s => !s.isFree).length; }
+}
+
+</script>
+
+<script>
+/* ---- js/board.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   The board: a grid of cells holding buckets and walls.
+
+   Reachability mirrors the shipped rule closely enough to feel right: a
+   bucket can be sent to the belt when there is a corridor of empty cells
+   from it up to the top row (the row that faces the conveyor). Buckets
+   block each other, walls block everything.
+   ------------------------------------------------------------------------ */
+
+const CellType = { EMPTY: 0, WALL: 1 };
+
+let _bucketIdSeq = 0;
+
+class Bucket {
+
+  constructor(colorIndex, col, row) {
+    this.id = ++_bucketIdSeq;
+    this.colorIndex = colorIndex;
+    this.color = PALETTE[colorIndex % PALETTE.length].hex;
+    this.col = col;
+    this.row = row;
+
+    /** board -> travel -> slot -> full -> leaving -> done */
+    this.state = 'board';
+
+    // Capacity is measured in grains and comes from the sand picture: the
+    // grains of this colour are split evenly across the buckets wanting it.
+    this.capacity = 1;
+    this.filled = 0;
+    this.grainDebt = 0;     // fractional grains owed, carried between frames
+    this.visualFill = 0;    // chases fill, like BasketElement.LoadFill
+    this.x = 0; this.y = 0; // world position (board cells write this on layout)
+    this.scale = 1;
+    this.wobble = 0;        // little squash when it lands / is refused
+
+    // Travel bookkeeping
+    this.path = null;       // list of {col,row} cells being walked
+    this.pathT = 0;
+    this.slot = null;
+    this.jumpT = 0;
+    this.jumpFrom = null;
+    this.fullTimer = 0;
+    this.popT = 0;
+  }
+
+  /** Logical fill 0..1. */
+  get fill() { return this.capacity > 0 ? Math.min(1, this.filled / this.capacity) : 0; }
+
+  get reachedCapacity() { return this.filled >= this.capacity; }
+}
+
+class Board {
+
+  constructor(cfg) {
+    this.cols = cfg.cols;
+    this.rows = cfg.rows;
+    this.cells = [];
+    this.buckets = [];
+    this.layout();
+    this.generate(cfg);
+  }
+
+  /* ------------------------------------------------------------ geometry */
+
+  layout() {
+    const availW = WORLD.w - LAYOUT.boardPadX * 2;
+    const availH = LAYOUT.boardBottom - LAYOUT.boardTop;
+    this.cell = Math.min(availW / this.cols, availH / this.rows);
+    this.originX = (WORLD.w - this.cols * this.cell) / 2;
+    this.originY = LAYOUT.boardTop + (availH - this.rows * this.cell) / 2;
+  }
+
+  cellCenter(col, row) {
+    return {
+      x: this.originX + (col + 0.5) * this.cell,
+      y: this.originY + (row + 0.5) * this.cell,
+    };
+  }
+
+  /** Where a bucket leaves the board on its way to the belt. */
+  exitPoint(col) {
+    return { x: this.originX + (col + 0.5) * this.cell, y: this.originY - this.cell * 0.35 };
+  }
+
+  worldToCell(x, y) {
+    const col = Math.floor((x - this.originX) / this.cell);
+    const row = Math.floor((y - this.originY) / this.cell);
+    if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return null;
+    return { col, row };
+  }
+
+  /* ---------------------------------------------------------- generation */
+
+  generate(cfg) {
+    const rng = Util.mulberry32(cfg.seed);
+    this.cells = [];
+    this.buckets = [];
+
+    for (let r = 0; r < this.rows; r++) {
+      const row = [];
+      for (let c = 0; c < this.cols; c++) {
+        // Keep the top row clear of walls so there is always a way out.
+        const wall = r > 0 && rng() < cfg.wallChance;
+        row.push({ type: wall ? CellType.WALL : CellType.EMPTY, bucket: null });
+      }
+      this.cells.push(row);
+    }
+
+    // Only place buckets in cells that can reach the top row when other
+    // buckets are ignored — that keeps every generated level solvable.
+    const open = this.cellsConnectedToExit();
+    const candidates = [];
+    for (const key of open) {
+      const [c, r] = key.split(',').map(Number);
+      candidates.push({ c, r });
+    }
+    // Shuffle deterministically.
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+
+    const wanted = Math.max(2, Math.round(candidates.length * cfg.density));
+    const colorCount = Util.clamp(cfg.colors, 1, PALETTE.length);
+    for (let i = 0; i < wanted && i < candidates.length; i++) {
+      const { c, r } = candidates[i];
+      // Round-robin over the shuffled candidates spreads the colours evenly,
+      // which keeps the sand picture from being dominated by one colour.
+      const bucket = new Bucket(i % colorCount, c, r);
+      const p = this.cellCenter(c, r);
+      bucket.x = p.x; bucket.y = p.y;
+      this.cells[r][c].bucket = bucket;
+      this.buckets.push(bucket);
+    }
+  }
+
+  /** Flood fill from the top row over non-wall cells (buckets treated as passable). */
+  cellsConnectedToExit() {
+    const seen = new Set();
+    const queue = [];
+    for (let c = 0; c < this.cols; c++) {
+      if (this.cells[0][c].type !== CellType.WALL) { seen.add(`${c},0`); queue.push([c, 0]); }
+    }
+    while (queue.length) {
+      const [c, r] = queue.shift();
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr;
+        if (nc < 0 || nr < 0 || nc >= this.cols || nr >= this.rows) continue;
+        const key = `${nc},${nr}`;
+        if (seen.has(key) || this.cells[nr][nc].type === CellType.WALL) continue;
+        seen.add(key);
+        queue.push([nc, nr]);
+      }
+    }
+    return seen;
+  }
+
+  /* -------------------------------------------------------- reachability */
+
+  /** True when the cell can be walked through right now (no wall, no bucket). */
+  isWalkable(col, row) {
+    if (col < 0 || row < 0 || col >= this.cols || row >= this.rows) return false;
+    const cell = this.cells[row][col];
+    return cell.type !== CellType.WALL && cell.bucket === null;
+  }
+
+  /**
+   * Recompute which buckets can currently be sent to the belt.
+   * Multi-source BFS from the top row across empty cells; a bucket touching
+   * that region (or standing in the top row) is collectible.
+   */
+  refreshReachable() {
+    const reached = new Set();
+    const queue = [];
+    for (let c = 0; c < this.cols; c++) {
+      if (this.isWalkable(c, 0)) { reached.add(`${c},0`); queue.push([c, 0]); }
+    }
+    while (queue.length) {
+      const [c, r] = queue.shift();
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nc = c + dc, nr = r + dr;
+        const key = `${nc},${nr}`;
+        if (reached.has(key) || !this.isWalkable(nc, nr)) continue;
+        reached.add(key);
+        queue.push([nc, nr]);
+      }
+    }
+    this.reachedCells = reached;
+
+    for (const bucket of this.buckets) {
+      if (bucket.state !== 'board') { bucket.collectible = false; continue; }
+      if (bucket.row === 0) { bucket.collectible = true; continue; }
+      bucket.collectible = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+        .some(([dc, dr]) => reached.has(`${bucket.col + dc},${bucket.row + dr}`));
+    }
+  }
+
+  /**
+   * Shortest path from a bucket to the top row, across empty cells.
+   * Returns the cell list starting with the bucket's own cell.
+   */
+  findPath(bucket) {
+    if (bucket.row === 0) return [{ col: bucket.col, row: bucket.row }];
+
+    const start = `${bucket.col},${bucket.row}`;
+    const prev = new Map([[start, null]]);
+    const queue = [[bucket.col, bucket.row]];
+
+    while (queue.length) {
+      const [c, r] = queue.shift();
+      for (const [dc, dr] of [[0, -1], [1, 0], [-1, 0], [0, 1]]) {
+        const nc = c + dc, nr = r + dr;
+        const key = `${nc},${nr}`;
+        if (prev.has(key) || !this.isWalkable(nc, nr)) continue;
+        prev.set(key, `${c},${r}`);
+        if (nr === 0) return this.rebuildPath(prev, key);
+        queue.push([nc, nr]);
+      }
+    }
+    return null;
+  }
+
+  rebuildPath(prev, endKey) {
+    const path = [];
+    let key = endKey;
+    while (key) {
+      const [c, r] = key.split(',').map(Number);
+      path.push({ col: c, row: r });
+      key = prev.get(key);
+    }
+    return path.reverse();
+  }
+
+  /* ------------------------------------------------------------ mutation */
+
+  /** Take the bucket off the grid so other buckets can path through immediately. */
+  detach(bucket) {
+    const cell = this.cells[bucket.row][bucket.col];
+    if (cell.bucket === bucket) cell.bucket = null;
+  }
+
+  remainingOnBoard() { return this.buckets.filter(b => b.state === 'board').length; }
+}
+
+</script>
+
+<script>
+/* ---- js/game.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   Game rules: tap/drag a bucket -> reserve a slot -> walk to the top row ->
+   hop onto the (moving) slot -> fill inside the collect zone -> pop at 100%
+   and free the slot. Win when the board and the belt are empty.
+
+   Deliberately out of scope (see README): obstacles, boosters, the real sand
+   picture, and the out-of-slots fail state. The sand strip here is a readout,
+   not a supply constraint.
+   ------------------------------------------------------------------------ */
+
+class Game {
+
+  constructor() {
+    this.belt = new Belt();
+    this.onToast = () => {};
+    this.newLevel(CONFIG.level.seed);
+  }
+
+  /* ------------------------------------------------------------ lifecycle */
+
+  newLevel(seed) {
+    if (seed != null) CONFIG.level.seed = seed;
+    this.board = new Board(CONFIG.level);
+    this.board.refreshReachable();
+    this.buildSandLedger();
+
+    this.belt.slots = [];
+    this.belt.rebuildSlots();
+    this.belt.scroll = 0;
+
+    this.flying = [];        // buckets between the board and their slot
+    this.particles = [];
+    this.state = 'playing';
+    this.time = 0;
+    this.moves = 0;
+    this.cleared = 0;
+    this.hoverBucket = null;
+    this.rejectFlash = 0;
+    this.lastGrainAt = 0;
+    this.stalled = false;
+    this._pred = { bucketId: null, slot: null, at: -1e9 };
+
+    // Streak reward (js/firework.js) — arms itself only if the streak is on.
+    this.firework = this.firework || new FireworkShow(this);
+    this.firework.armForLevel();
+  }
+
+  /**
+   * Build the picture, then split its grains across the buckets that want
+   * each colour — even share, remainder to the last bucket of that colour.
+   * This is the shipped `size` / `offsetSize` ledger, and it guarantees the
+   * picture drains to exactly empty when the level is cleared.
+   */
+  buildSandLedger() {
+    const rng = Util.mulberry32(CONFIG.level.seed ^ 0x9e3779b9);
+
+    const demand = new Map();
+    for (const b of this.board.buckets) demand.set(b.colorIndex, (demand.get(b.colorIndex) || 0) + 1);
+
+    const res = Math.max(8, Math.round(CONFIG.sand.resolution));
+    this.picture = new SandPicture(res, res);
+    const supply = this.picture.generate(demand, rng);
+
+    for (const [color, buckets] of demand) {
+      const grains = supply.get(color) || 0;
+      const share = Math.floor(grains / buckets);
+      const remainder = grains % buckets;
+      const owners = this.board.buckets.filter(b => b.colorIndex === color);
+      owners.forEach((b, i) => {
+        b.capacity = Math.max(1, share + (i === owners.length - 1 ? remainder : 0));
+        b.filled = 0;
+        b.grainDebt = 0;
+        b.visualFill = 0;
+      });
+    }
+  }
+
+  restart() { this.newLevel(CONFIG.level.seed); }
+
+  randomLevel() { this.newLevel((Math.random() * 1e6) | 0); }
+
+  /** Grid size / density changed — rebuild keeping the same seed. */
+  rebuildBoard() { this.newLevel(CONFIG.level.seed); }
+
+  /* --------------------------------------------------------- slot picking */
+
+  /**
+   * The rule that decides which slot a bucket lands in.
+   * `nearestToAnchor` reproduces the shipped GetSlotOnFree(): nearest free
+   * slot to a fixed point on the belt.
+   */
+  pickSlot(bucket) {
+    const free = this.belt.freeSlots();
+    if (!free.length) return null;
+
+    const nearestTo = (px, py) => free.reduce((best, s) =>
+      Util.dist(s.x, s.y, px, py) < Util.dist(best.x, best.y, px, py) ? s : best);
+
+    switch (CONFIG.indicator.rule) {
+      case 'firstInTravel':
+        return free.reduce((b, s) => this.belt.distanceToAnchor(s) < this.belt.distanceToAnchor(b) ? s : b);
+      case 'lastInTravel':
+        return free.reduce((b, s) => this.belt.distanceToAnchor(s) > this.belt.distanceToAnchor(b) ? s : b);
+      case 'nearestToExit': {
+        const p = bucket ? this.board.exitPoint(bucket.col) : this.belt.anchorPoint();
+        return nearestTo(p.x, p.y);
+      }
+      case 'nearestToAnchor':
+      default: {
+        const a = this.belt.anchorPoint();
+        return nearestTo(a.x, a.y);
+      }
+    }
+  }
+
+  /**
+   * Prediction shown before the tap. Re-picking every frame makes the
+   * indicator hop as the belt moves, so the result is held for stickyMs.
+   */
+  predictSlot(bucket) {
+    const now = this.time * 1000;
+    const p = this._pred;
+    const sameBucket = p.bucketId === (bucket ? bucket.id : null);
+    if (sameBucket && p.slot && p.slot.isFree && now - p.at < CONFIG.indicator.stickyMs) return p.slot;
+    const slot = this.pickSlot(bucket);
+    this._pred = { bucketId: bucket ? bucket.id : null, slot, at: now };
+    return slot;
+  }
+
+  /** Nearest slot to a pointer, for drag-and-drop. Occupied slots are reported too. */
+  slotUnderPointer(x, y, radius) {
+    let best = null, bestDist = Infinity;
+    for (const slot of this.belt.slots) {
+      const d = Util.dist(x, y, slot.x, slot.y);
+      if (d < bestDist) { bestDist = d; best = slot; }
+    }
+    if (!best || bestDist > radius) return null;
+    return best;
+  }
+
+  /* ------------------------------------------------------------- commands */
+
+  /**
+   * Send a bucket to the belt. `slot` is the drag-and-drop target; when it is
+   * null the configured picker chooses, which is the shipped tap behaviour.
+   *
+   * `flightFrom` decides how the bucket gets there and is what separates the
+   * three control schemes:
+   *   null            walk the corridor of empty cells, then hop  (tap)
+   *   pointer point   fly straight from where the finger let go    (drag)
+   *   the cell centre fly straight from where it was standing      (aim)
+   *
+   * Returns a reason string on failure so the UI can explain itself.
+   */
+  place(bucket, slot, flightFrom) {
+    if (this.state !== 'playing') return 'over';
+    if (!bucket || bucket.state !== 'board') return 'invalid';
+    if (!bucket.collectible) { bucket.wobble = 1; return 'blocked'; }
+
+    const target = slot && slot.isFree ? slot : this.pickSlot(bucket);
+    if (!target) { this.rejectFlash = 1; return 'nofreeslot'; }
+
+    // The corridor still has to exist even when the bucket flies over it —
+    // reachability is the rule, the walk is only how it is shown.
+    const path = this.board.findPath(bucket);
+    if (!path) { bucket.wobble = 1; return 'blocked'; }
+
+    this.board.detach(bucket);
+    this.board.refreshReachable();
+
+    bucket.slot = target;
+    target.reserved = bucket;
+
+    if (flightFrom) {
+      bucket.x = flightFrom.x;
+      bucket.y = flightFrom.y;
+      bucket.state = 'jump';
+      bucket.jumpT = 0;
+      bucket.jumpFrom = { x: flightFrom.x, y: flightFrom.y };
+    } else {
+      bucket.state = 'travel';
+      bucket.path = path;
+      bucket.pathT = 0;
+    }
+
+    this.flying.push(bucket);
+    this.moves++;
+    this._pred.at = -1e9;   // force a fresh prediction now the belt changed
+    return null;
+  }
+
+  addSlot() {
+    if (!this.belt.addSlot()) { this.onToast('Slot limit reached'); return; }
+    this.onToast('+1 slot');
+  }
+
+  /**
+   * Apply a slot-count change from the panel. Slots that disappear may still
+   * hold (or be reserved by) a bucket, so those buckets are retired here —
+   * otherwise they dangle and the win check never fires.
+   */
+  setSlotCount() {
+    const keep = CONFIG.belt.slotCount;
+    for (const slot of this.belt.slots.slice(keep)) {
+      const bucket = slot.bucket || slot.reserved;
+      if (bucket) {
+        bucket.state = 'done';
+        this.flying = this.flying.filter(b => b !== bucket);
+      }
+      slot.bucket = null;
+      slot.reserved = null;
+    }
+    this.belt.rebuildSlots();
+  }
+
+  /* ----------------------------------------------------------------- tick */
+
+  update(dt) {
+    this.time += dt;
+    const m = this.belt.speedMul;
+
+    this.belt.update(dt);
+    this.updateFlying(dt, m);
+    this.updateSlots(dt, m);
+    this.picture.settle(CONFIG.sand.settleSteps);
+    this.updateParticles(dt);
+    this.firework.update(dt);
+
+    this.rejectFlash = Math.max(0, this.rejectFlash - dt * 2.2);
+
+    for (const b of this.board.buckets) {
+      if (b.wobble > 0) b.wobble = Math.max(0, b.wobble - dt * 3.5);
+    }
+
+    // Warning pulse on the slots once the belt is nearly full — the shipped
+    // PlayWarningAnim is the player's "you are running out of room" signal.
+    const free = this.belt.freeSlots().length;
+    const warnLevel = free === 0 ? 1 : (free === 1 ? 0.6 : 0);
+    for (const slot of this.belt.slots) {
+      const target = slot.isFree ? 0 : warnLevel;
+      slot.warn += (target - slot.warn) * Math.min(1, dt * 6);
+    }
+
+    // Soft-lock watch. With a collection radius a bucket can hold a slot while
+    // its colour is buried or out of reach; if that happens on every slot the
+    // level cannot progress, so surface it instead of leaving the player stuck.
+    this.stalled = free === 0 && this.flying.length === 0 &&
+      this.time - this.lastGrainAt > 5;
+
+    if (this.state === 'playing' && this.board.buckets.every(b => b.state === 'done')) {
+      this.state = 'won';
+    }
+  }
+
+  updateFlying(dt, m) {
+    for (let i = this.flying.length - 1; i >= 0; i--) {
+      const b = this.flying[i];
+
+      if (b.state === 'travel') {
+        const segments = b.path.length - 1;
+        b.pathT += dt * m / Math.max(0.001, CONFIG.motion.cellTime);
+        if (segments <= 0 || b.pathT >= segments) {
+          const last = b.path[b.path.length - 1];
+          const c = this.board.cellCenter(last.col, last.row);
+          b.x = c.x; b.y = c.y;
+          b.state = 'jump';
+          b.jumpT = 0;
+          b.jumpFrom = { x: c.x, y: c.y };
+        } else {
+          const seg = Math.floor(b.pathT);
+          const t = b.pathT - seg;
+          const a = this.board.cellCenter(b.path[seg].col, b.path[seg].row);
+          const c = this.board.cellCenter(b.path[seg + 1].col, b.path[seg + 1].row);
+          b.x = Util.lerp(a.x, c.x, t);
+          b.y = Util.lerp(a.y, c.y, t);
+        }
+        continue;
+      }
+
+      if (b.state === 'jump') {
+        b.jumpT += dt * m / Math.max(0.001, CONFIG.motion.jumpTime);
+        const t = Util.clamp(b.jumpT, 0, 1);
+        const e = Util.easeInOutCubic(t);
+        // The slot keeps moving while the bucket is in the air, so the target
+        // is re-read every frame instead of being cached at reservation time.
+        const seat = this.belt.seat(b.slot);
+        const sx = seat.x, sy = seat.y;
+        b.x = Util.lerp(b.jumpFrom.x, sx, e);
+        b.y = Util.lerp(b.jumpFrom.y, sy, e) - Math.sin(Math.PI * t) * CONFIG.motion.jumpArc;
+        b.scale = 1 + Math.sin(Math.PI * t) * 0.12;
+        if (t >= 1) {
+          b.state = 'slot';
+          b.scale = 1;
+          b.wobble = 1;
+          b.slot.reserved = null;
+          b.slot.bucket = b;
+          this.flying.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  updateSlots(dt, m) {
+    for (const slot of this.belt.slots) {
+      const b = slot.bucket;
+      if (!b) continue;
+
+      const seat = this.belt.seat(slot);
+      b.x = seat.x;
+      b.y = seat.y;
+      if (b.wobble > 0) b.wobble = Math.max(0, b.wobble - dt * 3.5);
+
+      if (b.state === 'slot') {
+        const canFill = !CONFIG.motion.fillOnlyInZone || slot.inZone;
+        if (canFill && !b.reachedCapacity) this.pourSand(b, dt, m);
+        if (b.reachedCapacity) { b.state = 'full'; b.fullTimer = 0; }
+      } else if (b.state === 'full') {
+        b.fullTimer += dt;
+        const ready = b.fullTimer >= CONFIG.motion.byeDelay && b.visualFill >= 0.995 && slot.inZone;
+        if (ready) {
+          // Shipped behaviour: the slot is released while the bucket is still
+          // visibly flying away.
+          b.state = 'leaving';
+          b.popT = 0;
+          slot.bucket = null;
+          this.cleared++;
+        }
+      }
+
+      // Visual fill chases the logical fill, fastest on the last leg.
+      this.advanceVisualFill(b, dt, m);
+    }
+
+    // Buckets that have left their slot still animate for a moment.
+    for (const b of this.board.buckets) {
+      if (b.state !== 'leaving') continue;
+      b.popT += dt / Math.max(0.001, CONFIG.motion.popTime);
+      b.scale = 1 + Util.easeOutBack(Util.clamp(b.popT, 0, 1)) * 0.35;
+      b.y -= dt * 90;
+      if (b.popT >= 1) b.state = 'done';
+    }
+
+    for (const b of this.flying) this.advanceVisualFill(b, dt, m);
+  }
+
+  advanceVisualFill(b, dt, m) {
+    if (b.visualFill >= b.fill) { b.visualFill = b.fill; return; }
+    const gap = b.fill - b.visualFill;
+    const speed = b.fill >= 1 ? 3.5 : Util.remap(0, 0.5, 1, 3.5, gap);
+    b.visualFill = Math.min(b.fill, b.visualFill + speed * m * dt);
+  }
+
+  /* ------------------------------------------------------ sand + particles */
+
+  /**
+   * Pull grains out of the picture and into a bucket. Grains are taken from
+   * the LOWEST remaining grain of that colour, which is what carves the
+   * funnel and makes the picture above it slump inwards.
+   *
+   * The count is credited when the grain leaves the picture; the flying grain
+   * and the sand mesh are presentation that catches up afterwards — the same
+   * logical/visual split the shipped bucket has.
+   */
+  pourSand(bucket, dt, m) {
+    const radius = CONFIG.sand.collectRadius;
+    bucket.grainDebt += CONFIG.motion.fillRate * bucket.capacity * m * dt;
+    bucket.inReach = false;
+
+    let budget = 12;   // cap the per-frame burst so a hitch cannot dump the picture
+    while (bucket.grainDebt >= 1 && budget-- > 0 && !bucket.reachedCapacity) {
+      const index = this.picture.lowestIndexNear(bucket.colorIndex, bucket.x, bucket.y, radius);
+      if (index < 0) {
+        // Nothing of this colour is under the bucket. Drop the owed fraction
+        // so it cannot bank up and dump a burst once sand comes back in range.
+        bucket.grainDebt = 0;
+        return;
+      }
+      const grain = this.picture.take(index);
+      bucket.grainDebt -= 1;
+      bucket.filled++;
+      bucket.inReach = true;
+      this.lastGrainAt = this.time;
+      this.spawnGrain(grain, bucket);
+    }
+    if (bucket.grainDebt < 1) {
+      bucket.inReach =
+        this.picture.lowestIndexNear(bucket.colorIndex, bucket.x, bucket.y, radius) >= 0;
+    }
+  }
+
+  /** One grain arcing out of the picture and down into the bucket. */
+  spawnGrain(grain, bucket) {
+    if (this.particles.length > 300) return;
+    const from = this.picture.worldOf(grain.col, grain.row);
+    const exitY = PICTURE_RECT.y + PICTURE_RECT.h;
+    this.particles.push({
+      sx: from.x, sy: from.y,
+      // Control point at the frame's lower edge above the bucket: the grain
+      // falls out of the picture and pours down into the cup.
+      cx: Util.lerp(from.x, bucket.x, 0.75),
+      cy: exitY + 6,
+      tx: bucket.x + (Math.random() - 0.5) * CONFIG.belt.slotSize * 0.3,
+      ty: bucket.y,
+      t: 0,
+      dur: CONFIG.sand.grainTime * (0.85 + Math.random() * 0.3),
+      color: bucket.color,
+      size: 2.4 + Math.random() * 2,
+      x: from.x, y: from.y,
+    });
+  }
+
+  updateParticles(dt) {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.t += dt * this.belt.speedMul;
+      if (p.t >= p.dur) { this.particles.splice(i, 1); continue; }
+      const t = p.t / p.dur;
+      const it = 1 - t;
+      p.x = it * it * p.sx + 2 * it * t * p.cx + t * t * p.tx;
+      p.y = it * it * p.sy + 2 * it * t * p.cy + t * t * p.ty;
+    }
+  }
+
+  /* ------------------------------------------------------------- readouts */
+
+  get bucketsLeft() { return this.board.buckets.filter(b => b.state !== 'done' && b.state !== 'leaving').length; }
+  get freeSlotCount() { return this.belt.freeSlots().length; }
+}
+
+</script>
+
+<script>
+/* ---- js/firework.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   The streak firework — a core/meta reward, not a level piece.
+
+   If the player's streak is active when the level starts, one rocket
+   launches by itself:
+
+     1. it climbs from below the board, through the belt, into the picture;
+     2. at the apex it bangs and splits into CONFIG.firework.shells shells;
+     3. each shell dives onto ONE bucket on the board and destroys it, and
+        in the same instant vaporises exactly the grains that bucket was
+        going to collect. A streamer links the two so the cause reads.
+
+   Both halves happen on the same frame on purpose. The picture is the
+   ledger: its grains of a colour are split across the buckets wanting that
+   colour, so removing a bucket without its share would leave grains that
+   nothing can ever collect and the level would never drain to empty.
+
+   Targeting avoids the player's first moves: buckets that are collectible
+   right now and the front row are pushed to the back of the list, and the
+   middle rows score best (CONFIG.firework.aimMiddle). Grains are cut as a
+   cluster around the middle of the picture rather than from an edge.
+
+   Everything here is timed in seconds and scaled by CONFIG.firework.speed,
+   so the show can be slowed right down from the panel.
+   ------------------------------------------------------------------------ */
+
+/** Base durations in seconds, at 1× playback. */
+const FW_TIME = {
+  rise: 0.75,
+  hang: 0.12,     // beat at the apex before the split
+  dive: 0.6,
+  stagger: 0.16,  // gap between shell impacts, so it reads as a double crackle
+  ring: 0.45,
+  link: 0.7,
+  ghost: 0.5,
+  label: 2.2,
+};
+
+class FireworkShow {
+
+  constructor(game) {
+    this.game = game;
+    this.reset();
+  }
+
+  reset() {
+    this.wait = -1;       // < 0 = idle, otherwise seconds until launch
+    this.rocket = null;
+    this.shells = [];
+    this.rings = [];      // expanding blast rings
+    this.links = [];      // bucket -> sand-hole streamers
+    this.ghosts = [];     // destroyed buckets fading out of their cell
+    this.sparks = [];
+    this.labelT = 0;
+  }
+
+  /** Called from Game.newLevel. No-op unless the streak is active. */
+  armForLevel() {
+    this.reset();
+    if (CONFIG.firework.enabled) this.wait = Math.max(0, CONFIG.firework.launchDelay);
+  }
+
+  /** Panel button / F key: replay on the board as it stands. */
+  fireNow() {
+    if (this.busy) return false;
+    this.wait = 0.05;
+    return true;
+  }
+
+  get busy() { return this.wait >= 0 || !!this.rocket || this.shells.length > 0; }
+
+  /* ---------------------------------------------------------------- tick */
+
+  update(dt) {
+    // One scaled clock for the whole show.
+    const dts = dt * Math.max(0.02, CONFIG.firework.speed);
+
+    this.labelT = Math.max(0, this.labelT - dts);
+    this.advance(this.rings, dts);
+    this.advance(this.links, dts);
+    this.advance(this.ghosts, dts);
+    this.updateSparks(dts);
+
+    if (this.wait >= 0) {
+      this.wait -= dts;
+      if (this.wait < 0) this.launch();
+      return;
+    }
+
+    this.updateRocket(dts);
+    this.updateShells(dts);
+  }
+
+  advance(list, dts) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      list[i].t += dts;
+      if (list[i].t >= list[i].dur) list.splice(i, 1);
+    }
+  }
+
+  launch() {
+    const targets = this.pickTargets(Util.clamp(Math.round(CONFIG.firework.shells), 1, 5));
+    this.rocket = {
+      x: WORLD.w / 2,
+      y: WORLD.h + 60,
+      fromY: WORLD.h + 60,
+      apexY: PICTURE_RECT.y + PICTURE_RECT.h * 0.42,
+      targets,
+      t: 0,
+      dur: FW_TIME.rise + FW_TIME.hang,
+    };
+    this.labelT = FW_TIME.label;
+  }
+
+  updateRocket(dts) {
+    const rk = this.rocket;
+    if (!rk) return;
+    rk.t += dts;
+
+    // Decelerate into the apex, then hold there for a beat.
+    const climb = Util.clamp(rk.t / FW_TIME.rise, 0, 1);
+    const e = 1 - (1 - climb) * (1 - climb);
+    rk.y = Util.lerp(rk.fromY, rk.apexY, e);
+    rk.x = WORLD.w / 2 + Math.sin(rk.t * 22) * 3;
+
+    if (climb < 1) {
+      // Exhaust trail. The spawn rate follows the playback speed so slow
+      // motion doesn't leave a solid wall of sparks behind the rocket.
+      if (Math.random() < CONFIG.firework.speed + 0.3) {
+        this.spark(rk.x + (Math.random() - 0.5) * 7, rk.y + 16,
+          (Math.random() - 0.5) * 40, 70 + Math.random() * 90,
+          Math.random() < 0.5 ? '#fff3c4' : '#ffce1c', 0.45);
+      }
+    }
+
+    if (rk.t >= rk.dur) {
+      this.split(rk);
+      this.rocket = null;
+    }
+  }
+
+  /** The apex bang: white ring, a shower of sparks, one shell per target. */
+  split(rk) {
+    this.rings.push({ x: rk.x, y: rk.y, r: 46, color: '#ffffff', t: 0, dur: FW_TIME.ring });
+    for (let i = 0; i < 16; i++) {
+      const a = Math.PI * 2 * i / 16;
+      this.spark(rk.x, rk.y, Math.cos(a) * 150, Math.sin(a) * 150, '#ffffff', 0.5);
+    }
+
+    const n = rk.targets.length;
+    rk.targets.forEach((target, i) => {
+      // Fan the shells out sideways before they dive, so several paths read
+      // as separate arcs instead of one line.
+      const side = n === 1 ? 0 : (i * 2 / (n - 1) - 1);
+      this.shells.push({
+        sx: rk.x, sy: rk.y,
+        cx: rk.x + side * WORLD.w * 0.36,
+        cy: rk.y - 40,
+        x: rk.x, y: rk.y,
+        bucketId: target.id,
+        colorIndex: target.colorIndex,
+        color: target.color,
+        delay: i * FW_TIME.stagger,
+        t: 0,
+        dur: FW_TIME.dive,
+      });
+    });
+  }
+
+  updateShells(dts) {
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const sh = this.shells[i];
+      if (sh.delay > 0) { sh.delay -= dts; continue; }
+      sh.t += dts;
+
+      // The target sits still on the board, so its position is read fresh
+      // each frame (it can only leave if the player taps it — handled at
+      // impact) and the shell always dives at where it actually is.
+      const target = this.bucketById(sh.bucketId);
+      const to = target && target.state === 'board'
+        ? { x: target.x, y: target.y }
+        : (sh.lastTo || { x: sh.cx, y: WORLD.h * 0.8 });
+      sh.lastTo = to;
+
+      const t = Util.clamp(sh.t / sh.dur, 0, 1);
+      const it = 1 - t;
+      sh.x = it * it * sh.sx + 2 * it * t * sh.cx + t * t * to.x;
+      sh.y = it * it * sh.sy + 2 * it * t * sh.cy + t * t * to.y;
+
+      if (Math.random() < CONFIG.firework.speed + 0.3) {
+        this.spark(sh.x, sh.y, (Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60,
+          Util.mixHex(sh.color, '#ffffff', 0.4), 0.4);
+      }
+
+      if (t >= 1) {
+        this.detonate(sh);
+        this.shells.splice(i, 1);
+      }
+    }
+  }
+
+  bucketById(id) {
+    return this.game.board.buckets.find(b => b.id === id) || null;
+  }
+
+  /* -------------------------------------------------------------- impact */
+
+  /**
+   * One shell landing. The bucket and its grains go on the same frame, so
+   * the ledger can never end up short: no state in between.
+   */
+  detonate(sh) {
+    const game = this.game;
+    let bucket = this.bucketById(sh.bucketId);
+
+    // The player may have sent that bucket to the belt while the shell was
+    // in the air. Re-aim at whatever is still on the board rather than
+    // eating grains nothing owes.
+    if (!bucket || bucket.state !== 'board') {
+      const again = this.pickTargets(1);
+      bucket = again.length ? this.bucketById(again[0].id) : null;
+    }
+    if (!bucket || bucket.state !== 'board') {
+      this.fizzle(sh.x, sh.y);
+      return;
+    }
+
+    const owed = Math.max(0, bucket.capacity - bucket.filled);
+    const cell = game.board.cell;
+
+    // Bucket first: off the grid, marked done so the win check counts it.
+    game.board.detach(bucket);
+    bucket.state = 'done';
+    game.cleared++;
+    game.board.refreshReachable();
+
+    this.ghosts.push({
+      x: bucket.x, y: bucket.y, size: cell * 0.8,
+      color: bucket.color, t: 0, dur: FW_TIME.ghost,
+    });
+    this.rings.push({ x: bucket.x, y: bucket.y, r: cell * 0.8, color: bucket.color, t: 0, dur: FW_TIME.ring });
+    this.flower(bucket.x, bucket.y, bucket.color, 18);
+
+    // ...then the grains it was going to collect.
+    const hole = this.vaporize(bucket.colorIndex, owed, bucket.color);
+    if (hole) {
+      this.rings.push({ x: hole.x, y: hole.y, r: hole.r, color: bucket.color, t: 0, dur: FW_TIME.ring });
+      this.flower(hole.x, hole.y, bucket.color, 16);
+      this.links.push({
+        x1: bucket.x, y1: bucket.y, x2: hole.x, y2: hole.y,
+        color: bucket.color, t: 0, dur: FW_TIME.link,
+      });
+    }
+  }
+
+  fizzle(x, y) {
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.spark(x, y, Math.cos(a) * 90, Math.sin(a) * 90, '#ffffff', 0.45);
+    }
+  }
+
+  /**
+   * Take `count` grains of a colour out of the picture, as the cluster
+   * around the grain of that colour nearest the middle of the frame — so a
+   * hole is punched mid-picture and the sand above slumps into it.
+   * Returns the hole's world centre and radius.
+   */
+  vaporize(colorIndex, count, hex) {
+    if (count <= 0) return null;
+    const pic = this.game.picture;
+    const mine = [];
+    for (let i = 0; i < pic.cells.length; i++) {
+      if (pic.cells[i] === colorIndex) mine.push(i);
+    }
+    if (!mine.length) return null;
+
+    const midC = (pic.cols - 1) / 2, midR = (pic.rows - 1) / 2;
+    let anchor = mine[0], bestD = Infinity;
+    for (const i of mine) {
+      const dc = (i % pic.cols) - midC, dr = ((i / pic.cols) | 0) - midR;
+      const d = dc * dc + dr * dr;
+      if (d < bestD) { bestD = d; anchor = i; }
+    }
+    const ac = anchor % pic.cols, ar = (anchor / pic.cols) | 0;
+
+    mine.sort((a, b) => {
+      const dxa = (a % pic.cols) - ac, dya = ((a / pic.cols) | 0) - ar;
+      const dxb = (b % pic.cols) - ac, dyb = ((b / pic.cols) | 0) - ar;
+      return (dxa * dxa + dya * dya) - (dxb * dxb + dyb * dyb);
+    });
+
+    const take = Math.min(count, mine.length);
+    const step = Math.max(1, Math.floor(take / 22));   // subsample the puff
+    let far = 0;
+    for (let k = 0; k < take; k++) {
+      const i = mine[k];
+      const c = i % pic.cols, r = (i / pic.cols) | 0;
+      const d = Math.hypot(c - ac, r - ar);
+      if (d > far) far = d;
+      const p = pic.worldOf(c, r);
+      pic.take(i);
+      if (k % step === 0) {
+        this.spark(p.x, p.y, (Math.random() - 0.5) * 120, -40 - Math.random() * 120, hex, 0.7);
+      }
+    }
+
+    const grainW = PICTURE_RECT.w / pic.cols;
+    const centre = pic.worldOf(ac, ar);
+    return { x: centre.x, y: centre.y, r: Math.max(grainW * 2, far * grainW) };
+  }
+
+  /* ------------------------------------------------------------ targeting */
+
+  /**
+   * Pick up to `n` distinct buckets to blow up. Lower score wins: the middle
+   * rows are best, anything the player could tap right now is worst, and
+   * later shells prefer a different colour and a distant column so the
+   * blasts read as separate events.
+   */
+  pickTargets(n) {
+    const board = this.game.board;
+    const aim = CONFIG.firework.aimMiddle;
+    const middle = (board.rows - 1) / 2;
+
+    const pool = board.buckets
+      .filter(b => b.state === 'board')
+      .map(b => {
+        let score = Math.abs(b.row - middle) * 10 + Math.random() * 4;
+        if (aim && b.collectible) score += 100;   // a first-move bucket
+        if (aim && b.row === 0) score += 60;      // the front row
+        return { b, score };
+      });
+
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      let best = null, bestScore = Infinity;
+      for (const item of pool) {
+        if (item.used) continue;
+        let s = item.score;
+        for (const chosen of out) {
+          if (chosen.colorIndex === item.b.colorIndex) s += 15;
+          s -= Math.abs(chosen.col - item.b.col) * 2;
+        }
+        if (s < bestScore) { bestScore = s; best = item; }
+      }
+      if (!best) break;
+      best.used = true;
+      out.push(best.b);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------- sparks */
+
+  spark(x, y, vx, vy, color, life) {
+    if (this.sparks.length > 260) return;
+    this.sparks.push({
+      x, y, vx, vy, color,
+      life, maxLife: life,
+      size: 2.5 + Math.random() * 3,
+    });
+  }
+
+  flower(x, y, hex, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI * 2 * i / n + Math.random() * 0.3;
+      const sp = 120 + Math.random() * 180;
+      this.spark(x, y, Math.cos(a) * sp, Math.sin(a) * sp - 60,
+        i % 3 === 0 ? '#ffffff' : (i % 3 === 1 ? hex : Util.mixHex(hex, '#ffffff', 0.45)),
+        0.55 + Math.random() * 0.5);
+    }
+  }
+
+  updateSparks(dts) {
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const s = this.sparks[i];
+      s.x += s.vx * dts;
+      s.y += s.vy * dts;
+      s.vy += 420 * dts;
+      s.vx *= 1 - 1.2 * dts;
+      s.life -= dts;
+      if (s.life <= 0) this.sparks.splice(i, 1);
+    }
+  }
+
+  /* --------------------------------------------------------------- draw */
+
+  draw(ctx, renderer) {
+    this.drawGhosts(ctx, renderer);
+    this.drawLinks(ctx);
+    this.drawRings(ctx);
+    this.drawSparks(ctx);
+    this.drawRocket(ctx);
+    this.drawShells(ctx);
+    this.drawLabel(ctx, renderer);
+  }
+
+  /** The destroyed bucket, swelling and fading where it stood. */
+  drawGhosts(ctx, renderer) {
+    for (const g of this.ghosts) {
+      const u = g.t / g.dur;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - u);
+      renderer.drawBucketShape(ctx, g.x, g.y, g.size * (1 + u * 0.5), g.color, 0);
+      ctx.restore();
+    }
+  }
+
+  /** The line that says WHY that hole appeared in the picture. */
+  drawLinks(ctx) {
+    for (const l of this.links) {
+      const u = l.t / l.dur;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - u) * 0.9;
+      ctx.strokeStyle = l.color;
+      ctx.lineWidth = Util.lerp(6, 2, u);
+      ctx.lineCap = 'round';
+      ctx.setLineDash([14, 10]);
+      ctx.lineDashOffset = -l.t * 90;
+      ctx.beginPath();
+      ctx.moveTo(l.x1, l.y1);
+      ctx.lineTo(l.x2, l.y2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawRings(ctx) {
+    for (const r of this.rings) {
+      const u = r.t / r.dur;
+      const rad = r.r * (0.3 + u * 1.1);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - u);
+      ctx.fillStyle = r.color;
+      ctx.globalAlpha = Math.max(0, 0.28 * (1 - u));
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.85, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = Math.max(0, 1 - u);
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = Util.lerp(7, 1.5, u);
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawSparks(ctx) {
+    for (const s of this.sparks) {
+      ctx.globalAlpha = Util.clamp(s.life / s.maxLife, 0, 1);
+      ctx.fillStyle = s.color;
+      ctx.fillRect(s.x - s.size / 2, s.y - s.size / 2, s.size, s.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawRocket(ctx) {
+    const rk = this.rocket;
+    if (!rk) return;
+    const w = 20, h = 54;
+
+    ctx.save();
+    ctx.translate(rk.x, rk.y);
+
+    // Exhaust
+    const flame = 30 + Math.random() * 22;
+    const g = ctx.createLinearGradient(0, h * 0.4, 0, h * 0.4 + flame);
+    g.addColorStop(0, 'rgba(255,255,235,0.95)');
+    g.addColorStop(0.45, 'rgba(255,206,28,0.8)');
+    g.addColorStop(1, 'rgba(247,152,31,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.42, h * 0.4);
+    ctx.lineTo(w * 0.42, h * 0.4);
+    ctx.lineTo(0, h * 0.4 + flame);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(40,58,76,0.85)';
+    ctx.lineWidth = 3;
+
+    // Fins
+    ctx.fillStyle = SKIN.beltBody;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * w * 0.4, h * 0.1);
+      ctx.lineTo(s * w * 0.95, h * 0.44);
+      ctx.lineTo(s * w * 0.4, h * 0.44);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+
+    // White body with a red nose cone — the prototype's flat, outlined look.
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -h * 0.12);
+    ctx.lineTo(0, -h * 0.5);
+    ctx.lineTo(w / 2, -h * 0.12);
+    ctx.lineTo(w / 2, h * 0.4);
+    ctx.lineTo(-w / 2, h * 0.4);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill(); ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, -h * 0.12);
+    ctx.lineTo(0, -h * 0.5);
+    ctx.lineTo(w / 2, -h * 0.12);
+    ctx.closePath();
+    ctx.fillStyle = PALETTE[0].hex;
+    ctx.fill(); ctx.stroke();
+
+    ctx.restore();
+  }
+
+  drawShells(ctx) {
+    for (const sh of this.shells) {
+      if (sh.delay > 0) continue;
+      const pulse = 1 + Math.sin(this.game.time * 26) * 0.12;
+      ctx.save();
+      // Halo, white core, dark rim — readable over the picture and the board.
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = sh.color;
+      ctx.beginPath(); ctx.arc(sh.x, sh.y, 26 * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(sh.x, sh.y, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(40,58,76,0.85)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.fillStyle = sh.color;
+      ctx.beginPath(); ctx.arc(sh.x, sh.y, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  drawLabel(ctx, renderer) {
+    if (this.labelT <= 0) return;
+    const u = this.labelT / FW_TIME.label;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, u * 2.4);
+    // Above the frame: the belt band and the landing indicator live below it.
+    renderer.drawOutlinedText(ctx, 'STREAK BONUS!', WORLD.w / 2,
+      LAYOUT.frameY - 30, '800 34px system-ui, sans-serif');
+    ctx.restore();
+  }
+}
+
+</script>
+
+<script>
+/* ---- js/render.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   All drawing. The canvas is scaled so one unit = one WORLD unit, which
+   means every size in here matches the numbers in the tuning panel.
+
+   The look follows the shipped screen: pale sky, a white-framed pixel sand
+   picture that drains, a grey belt capped by two portals with circular slot
+   markers along it, and a light board slab with the cells cut into it.
+   ------------------------------------------------------------------------ */
+
+class Renderer {
+
+  constructor(ctx) { this.ctx = ctx; }
+
+  /** Belt strip thickness and bucket size both derive from the slot size. */
+  beltWidth() { return CONFIG.belt.slotSize * 0.86; }
+  bucketSize() { return CONFIG.belt.slotSize * 1.0; }
+
+  draw(game, view, input) {
+    const ctx = this.ctx;
+    this.view = view;
+
+    ctx.save();
+    // Everything is clipped to the play field so nothing bleeds into the
+    // letterbox bars.
+    ctx.beginPath();
+    ctx.rect(0, 0, WORLD.w, WORLD.h);
+    ctx.clip();
+
+    this.drawSky(ctx);
+    this.drawPicture(ctx, game);
+    this.drawBoard(ctx, game, input);
+    this.drawBelt(ctx, game);
+    this.drawSlots(ctx, game, input);
+    this.drawSlotBadge(ctx, game);
+    this.drawIndicator(ctx, game, input);
+    this.drawCollectRadius(ctx, game);
+    this.drawBuckets(ctx, game, input);
+    this.drawGestureBoard(ctx, game, input);
+    this.drawPortals(ctx, game);
+    this.drawParticles(ctx, game);
+    if (game.firework) game.firework.draw(ctx, this);
+    this.drawAim(ctx, game, input);
+    this.drawDrag(ctx, game, input);
+    this.drawHud(ctx, game);
+    if (CONFIG.debug.editBelt) this.drawBeltHandles(ctx, game, input);
+    ctx.restore();
+  }
+
+  /* -------------------------------------------------------------- sky */
+
+  drawSky(ctx) {
+    const g = ctx.createLinearGradient(0, 0, 0, WORLD.h);
+    g.addColorStop(0, SKIN.skyTop);
+    g.addColorStop(0.42, SKIN.skyMid);
+    g.addColorStop(1, SKIN.skyBottom);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, WORLD.w, WORLD.h);
+  }
+
+  /* ---------------------------------------------------------- picture */
+
+  drawPicture(ctx, game) {
+    const pic = game.picture;
+    pic.repaint();
+
+    const { frameX: x, frameY: y, frameW: w, frameH: h, frameBorder: b } = LAYOUT;
+
+    // Frame body with a soft drop shadow.
+    ctx.save();
+    ctx.shadowColor = SKIN.frameShadow;
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
+    Util.roundRect(ctx, x, y, w, h, 30);
+    ctx.fillStyle = SKIN.frame;
+    ctx.fill();
+    ctx.restore();
+
+    Util.roundRect(ctx, x, y, w, h, 30);
+    ctx.strokeStyle = SKIN.frameEdge;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // The sand itself, drawn as crisp pixels.
+    ctx.save();
+    Util.roundRect(ctx, x + b, y + b, w - b * 2, h - b * 2, 8);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pic.canvas, PICTURE_RECT.x, PICTURE_RECT.y, PICTURE_RECT.w, PICTURE_RECT.h);
+    ctx.imageSmoothingEnabled = true;
+    ctx.restore();
+
+    Util.roundRect(ctx, x + b, y + b, w - b * 2, h - b * 2, 8);
+    ctx.strokeStyle = 'rgba(60,80,98,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  /* ------------------------------------------------------------- board */
+
+  drawBoard(ctx, game, input) {
+    const b = game.board;
+    const cs = b.cell;
+    const slabPad = cs * 0.16;
+
+    // Tray the cells are cut into.
+    ctx.save();
+    ctx.shadowColor = 'rgba(90,116,140,0.25)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 5;
+    Util.roundRect(ctx, b.originX - slabPad, b.originY - slabPad,
+      b.cols * cs + slabPad * 2, b.rows * cs + slabPad * 2, cs * 0.3);
+    ctx.fillStyle = SKIN.boardSlab;
+    ctx.fill();
+    ctx.restore();
+
+    // Open lanes notched into the top edge, where buckets leave for the belt.
+    for (let c = 0; c < b.cols; c++) {
+      if (b.cells[0][c].type === CellType.WALL) continue;
+      const p = b.cellCenter(c, 0);
+      const wcell = cs * 0.88;
+      Util.roundRect(ctx, p.x - wcell / 2, b.originY - slabPad - 4, wcell, slabPad + cs * 0.4, cs * 0.16);
+      ctx.fillStyle = SKIN.cell;
+      ctx.fill();
+    }
+
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.cols; c++) {
+        if (b.cells[r][c].type === CellType.WALL) continue;
+        const p = b.cellCenter(c, r);
+        const inset = cs * 0.06;
+        Util.roundRect(ctx, p.x - cs / 2 + inset, p.y - cs / 2 + inset,
+          cs - inset * 2, cs - inset * 2, cs * 0.18);
+        ctx.fillStyle = SKIN.cell;
+        ctx.fill();
+        ctx.strokeStyle = SKIN.cellEdge;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        if (CONFIG.debug.showReach && b.reachedCells && b.reachedCells.has(`${c},${r}`)) {
+          ctx.fillStyle = 'rgba(23,143,216,0.22)';
+          ctx.fill();
+        }
+      }
+    }
+
+    this.drawPathPreview(ctx, game, input);
+  }
+
+  /** Trail along the cells the focused bucket is about to walk. */
+  drawPathPreview(ctx, game, input) {
+    // Only tap walks the corridor; a drag or an aim throws the bucket over it,
+    // so previewing the path during those gestures would be a lie.
+    if (!CONFIG.indicator.showPath || input.dragging) return;
+    const bucket = input.dragBucket || game.hoverBucket;
+    if (!bucket || bucket.state !== 'board' || !bucket.collectible) return;
+    const path = game.board.findPath(bucket);
+    if (!path || path.length < 2) return;
+
+    ctx.save();
+    ctx.strokeStyle = Util.rgba(SKIN.accent, 0.75);
+    ctx.lineWidth = Math.max(4, game.board.cell * 0.1);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([10, 10]);
+    ctx.lineDashOffset = -game.time * 40;
+    ctx.beginPath();
+    path.forEach((cell, i) => {
+      const p = game.board.cellCenter(cell.col, cell.row);
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    });
+    const exit = game.board.exitPoint(path[path.length - 1].col);
+    ctx.lineTo(exit.x, exit.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Mid-gesture the board dims and the cell the bucket came from stays lit:
+   * that cell is the undo. Drawn after the board buckets so they dim too, and
+   * clipped to the tray so the belt and the picture keep their brightness.
+   */
+  drawGestureBoard(ctx, game, input) {
+    if (!input.dragging || !input.originCell || !CONFIG.controls.dimBoard) return;
+
+    const b = game.board;
+    const cs = b.cell;
+    const pad = cs * 0.16;
+
+    ctx.save();
+    Util.roundRect(ctx, b.originX - pad, b.originY - pad,
+      b.cols * cs + pad * 2, b.rows * cs + pad * 2, cs * 0.3);
+    ctx.fillStyle = `rgba(26, 42, 58, ${CONFIG.controls.dimAmount})`;
+    ctx.fill();
+    ctx.restore();
+
+    if (!CONFIG.controls.cancelOnOrigin) return;
+
+    const p = b.cellCenter(input.originCell.col, input.originCell.row);
+    const inset = cs * 0.06;
+    const armed = input.overOrigin;
+    const pulse = 0.5 + 0.5 * Math.sin(game.time * 6);
+
+    ctx.save();
+    Util.roundRect(ctx, p.x - cs / 2 + inset, p.y - cs / 2 + inset,
+      cs - inset * 2, cs - inset * 2, cs * 0.18);
+    ctx.fillStyle = armed ? '#ffe9cc' : SKIN.cell;
+    ctx.fill();
+    ctx.setLineDash([9, 7]);
+    ctx.lineDashOffset = -game.time * 26;
+    ctx.lineWidth = armed ? 5 : 3;
+    ctx.strokeStyle = Util.rgba(SKIN.accent, armed ? 1 : 0.5 + 0.3 * pulse);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Return arrow, drawn rather than typed so no font can drop the glyph.
+    const r = cs * 0.19;
+    ctx.strokeStyle = SKIN.accent;
+    ctx.lineWidth = Math.max(3, cs * 0.055);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - r * 0.15, r, Math.PI * 0.85, Math.PI * 2.1);
+    ctx.stroke();
+    const tipX = p.x - r, tipY = p.y - r * 0.15;
+    ctx.beginPath();
+    ctx.moveTo(tipX - r * 0.42, tipY - r * 0.30);
+    ctx.lineTo(tipX, tipY + r * 0.16);
+    ctx.lineTo(tipX + r * 0.44, tipY - r * 0.26);
+    ctx.stroke();
+
+    ctx.fillStyle = SKIN.ink;
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('CANCEL', p.x, p.y + cs * 0.3);
+    ctx.restore();
+  }
+
+  /**
+   * Aim mode: the bucket stays on the board and you steer a cursor. The
+   * trajectory runs to the snapped slot when there is one, so the snap is
+   * visible before you commit.
+   */
+  drawAim(ctx, game, input) {
+    if (!input.dragging || !input.dragBucket || CONFIG.controls.mode !== 'aim') return;
+
+    const bucket = input.dragBucket;
+    const from = game.board.cellCenter(bucket.col, bucket.row);
+    const cursor = input.pointer;
+    const locked = input.dragSlot && input.dragSlot.isFree;
+    const to = locked ? game.belt.seat(input.dragSlot) : { x: cursor.x, y: cursor.y };
+    const color = input.overOrigin ? SKIN.danger : (locked ? SKIN.accent : SKIN.inkSoft);
+
+    ctx.save();
+
+    if (!input.overOrigin) {
+      // Quadratic arc lifted between the two ends — the throw it would make.
+      const cx = (from.x + to.x) / 2;
+      const cy = (from.y + to.y) / 2 - CONFIG.controls.aimArc;
+      ctx.strokeStyle = Util.rgba(color, locked ? 0.95 : 0.55);
+      ctx.lineWidth = locked ? 5 : 3.5;
+      ctx.lineCap = 'round';
+      ctx.setLineDash([13, 11]);
+      ctx.lineDashOffset = -game.time * 60;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.quadraticCurveTo(cx, cy, to.x, to.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Anchor dot on the bucket so the line reads as leaving it.
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(from.x, from.y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // The cursor itself.
+    const rings = locked ? 1 : 0.85;
+    const spin = game.time * (locked ? 2.4 : 0.9);
+    ctx.translate(cursor.x, cursor.y);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = Util.rgba(color, 0.16);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(0, 0, 24 * rings, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.rotate(spin);
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, -32 * rings);
+      ctx.lineTo(0, -24 * rings - 3);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    if (locked) {
+      ctx.save();
+      ctx.strokeStyle = SKIN.accent;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, CONFIG.belt.slotSize * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /* -------------------------------------------------------------- belt */
+
+  /**
+   * Walk the path and stroke it between two arc lengths.
+   * posAt() wraps, so the far end is sampled a hair short: asking for exactly
+   * `length` returns the START of the path and draws a chord across the screen
+   * between the two portals.
+   */
+  traceBelt(ctx, path, from, to, step = 6) {
+    const last = Math.min(to, path.length - 0.01);
+    ctx.beginPath();
+    for (let s = from; s <= last; s += step) {
+      const p = path.posAt(s);
+      if (s === from) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    }
+    const end = path.posAt(last);
+    ctx.lineTo(end.x, end.y);
+  }
+
+  drawBelt(ctx, game) {
+    const belt = game.belt;
+    const path = belt.path;
+    const width = this.beltWidth();
+
+    ctx.save();
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+
+    // Body
+    ctx.lineWidth = width;
+    ctx.strokeStyle = SKIN.beltBody;
+    this.traceBelt(ctx, path, 0, path.length);
+    ctx.stroke();
+
+    // Treads scrolling along the belt.
+    ctx.lineWidth = width * 0.94;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.setLineDash([4, 16]);
+    ctx.lineDashOffset = -belt.scroll * Math.sign(CONFIG.belt.direction || 1);
+    this.traceBelt(ctx, path, 0, path.length);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Top highlight and bottom shade, offset along the belt normal.
+    const band = (offset, thickness, color) => {
+      ctx.lineWidth = thickness;
+      ctx.strokeStyle = color;
+      const last = path.length - 0.01;
+      ctx.beginPath();
+      for (let s = 0; s <= last; s += 6) {
+        const p = path.posAt(Math.min(s, last));
+        const nx = Math.sin(p.angle), ny = -Math.cos(p.angle);
+        const x = p.x + nx * offset, y = p.y + ny * offset;
+        if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    };
+    band(width * 0.42, width * 0.16, SKIN.beltLight);
+    band(-width * 0.44, width * 0.12, SKIN.beltDark);
+
+    if (CONFIG.debug.showZone) {
+      const z0 = Math.min(CONFIG.belt.zoneStart, CONFIG.belt.zoneEnd) * path.length;
+      const z1 = Math.max(CONFIG.belt.zoneStart, CONFIG.belt.zoneEnd) * path.length;
+      ctx.lineWidth = width;
+      ctx.strokeStyle = 'rgba(23,143,216,0.20)';
+      this.traceBelt(ctx, path, z0, z1);
+      ctx.stroke();
+
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(23,143,216,0.7)';
+      for (const s of [z0, z1]) {
+        const p = path.posAt(s);
+        const nx = Math.sin(p.angle), ny = -Math.cos(p.angle);
+        ctx.beginPath();
+        ctx.moveTo(p.x - nx * width / 2, p.y - ny * width / 2);
+        ctx.lineTo(p.x + nx * width / 2, p.y + ny * width / 2);
+        ctx.stroke();
+      }
+      const mid = path.posAt((z0 + z1) / 2);
+      ctx.fillStyle = SKIN.accentCool;
+      ctx.font = '700 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('COLLECT ZONE', mid.x, mid.y + width * 0.5 + 14);
+    }
+
+    // Anchor marker: the point the shipped picker measures "nearest" from.
+    if (CONFIG.indicator.rule === 'nearestToAnchor' && CONFIG.indicator.mode !== 'off') {
+      const a = belt.anchorPoint();
+      ctx.fillStyle = SKIN.accent;
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (CONFIG.debug.showSpline) {
+      ctx.strokeStyle = '#e0219a';
+      ctx.lineWidth = 1.5;
+      this.traceBelt(ctx, path, 0, path.length);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * The portals at the two ends of an open belt. A slot reaching the exit
+   * reappears at the entry, so these are drawn ON TOP of the buckets: a
+   * bucket slides into the dark mouth instead of blinking out.
+   */
+  drawPortals(ctx, game) {
+    const portals = game.belt.portals();
+    if (!portals) return;
+    const width = this.beltWidth();
+
+    for (const portal of portals) {
+      ctx.save();
+      ctx.translate(portal.x, portal.y);
+      ctx.rotate(portal.angle);
+
+      const w = width * 0.62, h = width * 2.15;
+      ctx.shadowColor = 'rgba(90,116,140,0.32)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 5;
+      Util.roundRect(ctx, -w / 2, -h / 2, w, h, w * 0.34);
+      const body = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+      body.addColorStop(0, '#ffffff');
+      body.addColorStop(1, SKIN.housing);
+      ctx.fillStyle = body;
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = SKIN.housingEdge;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // The mouth the slot disappears into / comes out of.
+      const mw = w * 0.42, mh = h * 0.56;
+      Util.roundRect(ctx, -mw / 2, -mh / 2, mw, mh, mw * 0.45);
+      ctx.fillStyle = '#4a5a6c';
+      ctx.fill();
+      Util.roundRect(ctx, -mw / 2 + 3, -mh / 2 + 3, mw - 6, mh - 6, mw * 0.4);
+      ctx.fillStyle = '#2f3d4d';
+      ctx.fill();
+
+      // Chevrons pointing the way traffic flows through this portal.
+      const dir = portal.kind === 'exit' ? 1 : -1;
+      ctx.strokeStyle = Util.rgba(SKIN.accent, 0.85);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 2; i++) {
+        const cx = dir * (w * 0.02 + i * 7);
+        ctx.beginPath();
+        ctx.moveTo(cx - dir * 5, -6);
+        ctx.lineTo(cx, 0);
+        ctx.lineTo(cx - dir * 5, 6);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * The reach of each collecting bucket. This is the mechanic the sand model
+   * turns on, so it is visible by default.
+   */
+  drawCollectRadius(ctx, game) {
+    if (!CONFIG.debug.showCollectRadius) return;
+    const radius = CONFIG.sand.collectRadius;
+
+    ctx.save();
+    // Only the part of the circle that crosses the sand tells you anything,
+    // and clipping keeps a 260-unit circle from scribbling over the board.
+    Util.roundRect(ctx, PICTURE_RECT.x, PICTURE_RECT.y, PICTURE_RECT.w, PICTURE_RECT.h, 8);
+    ctx.clip();
+
+    for (const slot of game.belt.slots) {
+      const b = slot.bucket;
+      if (!b || b.state !== 'slot') continue;
+      const alpha = game.belt.portalAlpha(slot.s);
+      if (alpha <= 0.02) continue;
+
+      const reaching = b.inReach !== false;
+      ctx.globalAlpha = alpha * (reaching ? 0.85 : 0.4);
+      ctx.strokeStyle = reaching ? '#ffffff' : SKIN.ink;
+      ctx.lineWidth = 3;
+      ctx.setLineDash(reaching ? [9, 9] : [3, 9]);
+      ctx.lineDashOffset = -game.time * 22;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  drawBeltHandles(ctx, game, input) {
+    ctx.save();
+    CONFIG.belt.points.forEach((p, i) => {
+      const active = input.dragPointIndex === i;
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], active ? 12 : 9, 0, Math.PI * 2);
+      ctx.fillStyle = active ? SKIN.accent : Util.rgba(SKIN.accent, 0.6);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i), p[0], p[1]);
+    });
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------- slots */
+
+  drawSlots(ctx, game, input) {
+    const size = CONFIG.belt.slotSize;
+    const order = this.freeSlotOrder(game);
+    // While the release would cancel, the slots stop advertising themselves.
+    const dragging = !!(input && input.dragging && input.dragBucket && !input.overOrigin);
+
+    game.belt.slots.forEach(slot => {
+      const grow = Util.easeOutBack(Util.clamp(slot.entering, 0, 1));
+      // Slots dissolve into the portals instead of teleporting.
+      const portalAlpha = game.belt.portalAlpha(slot.s);
+      if (portalAlpha <= 0.02) return;
+
+      // Empty-slot marker: a recessed disc on the belt surface.
+      ctx.save();
+      ctx.globalAlpha = portalAlpha;
+      ctx.translate(slot.x, slot.y);
+      ctx.rotate(slot.angle);
+      ctx.scale(grow, grow);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, size * 0.36, size * 0.19, 0, 0, Math.PI * 2);
+      ctx.fillStyle = slot.isFree ? SKIN.slotHoleFree : SKIN.slotHole;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.34)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      if (slot.warn > 0.01) {
+        const pulse = 0.4 + 0.4 * Math.sin(game.time * 7);
+        ctx.strokeStyle = Util.rgba(SKIN.danger, slot.warn * pulse);
+        ctx.lineWidth = 5;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      const seat = game.belt.seat(slot);
+      ctx.save();
+      ctx.globalAlpha = portalAlpha;
+
+      // While dragging, every free slot advertises itself as a drop target.
+      if (dragging && slot.isFree) {
+        const pulse = 0.45 + 0.25 * Math.sin(game.time * 5 + slot.id);
+        ctx.save();
+        ctx.strokeStyle = Util.rgba(SKIN.accent, 0.4 * pulse + 0.35);
+        ctx.setLineDash([7, 7]);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(seat.x, seat.y, size * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      if (CONFIG.indicator.showOrder && slot.isFree) {
+        const n = order.indexOf(slot);
+        if (n >= 0) {
+          const y = seat.y - size * 0.6;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(seat.x, y, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = Util.rgba(SKIN.accent, 0.9);
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = SKIN.accent;
+          ctx.font = '800 13px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(n + 1), seat.x, y);
+        }
+      }
+      ctx.restore();
+    });
+  }
+
+  /** Free slots ordered by how soon they reach the anchor. */
+  freeSlotOrder(game) {
+    return game.belt.freeSlots()
+      .slice()
+      .sort((a, b) => game.belt.distanceToAnchor(a) - game.belt.distanceToAnchor(b));
+  }
+
+  /** The "n/5" plate under the belt: how many slots are in use. */
+  drawSlotBadge(ctx, game) {
+    const used = game.belt.occupiedCount();
+    const total = game.belt.slots.length;
+    const text = `${used}/${total}`;
+    const w = 118, h = 52;
+    const x = WORLD.w / 2 - w / 2, y = LAYOUT.badgeY - h / 2;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(90,116,140,0.3)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 4;
+    Util.roundRect(ctx, x, y, w, h, 12);
+    ctx.fillStyle = used >= total ? '#f4d3d1' : '#eef4f8';
+    ctx.fill();
+    ctx.restore();
+
+    Util.roundRect(ctx, x, y, w, h, 12);
+    ctx.strokeStyle = used >= total ? SKIN.danger : SKIN.housingEdge;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = used >= total ? SKIN.danger : SKIN.ink;
+    ctx.font = '800 30px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, WORLD.w / 2, LAYOUT.badgeY + 1);
+  }
+
+  /* --------------------------------------------------------- indicator */
+
+  drawIndicator(ctx, game, input) {
+    const mode = CONFIG.indicator.mode;
+    if (mode === 'off' || game.state !== 'playing') return;
+
+    const targets = [];
+
+    // Committed: every slot already reserved by a bucket in flight.
+    if (mode === 'committed' || mode === 'both') {
+      for (const slot of game.belt.slots) {
+        if (slot.reserved) targets.push({ slot, source: slot.reserved, committed: true });
+      }
+    }
+
+    // Predictive: where the bucket under the finger would land.
+    if (mode === 'predictive' || mode === 'both') {
+      const bucket = input.dragBucket || game.hoverBucket;
+      let slot = null;
+      if (input.dragBucket && input.dragSlot) slot = input.dragSlot;
+      else if (bucket && bucket.collectible) slot = game.predictSlot(bucket);
+      else if (!bucket) slot = game.predictSlot(null);
+      if (slot && slot.isFree) targets.push({ slot, source: bucket, committed: false });
+    }
+
+    for (const t of targets) this.drawIndicatorOn(ctx, game, t);
+  }
+
+  drawIndicatorOn(ctx, game, target) {
+    const style = CONFIG.indicator.style;
+    const wants = s => style === 'all' || style === s ||
+      (style === 'ringArrow' && (s === 'ring' || s === 'arrow'));
+
+    const slot = target.slot;
+    const seat = game.belt.seat(slot);
+    const size = CONFIG.belt.slotSize;
+    const color = target.committed ? SKIN.accentCool : SKIN.accent;
+    const pulse = 0.5 + 0.5 * Math.sin(game.time * 6);
+
+    ctx.save();
+    ctx.globalAlpha = game.belt.portalAlpha(slot.s);
+
+    if (wants('beam') && target.source) {
+      ctx.strokeStyle = Util.rgba(color, 0.5);
+      ctx.lineWidth = 4;
+      ctx.setLineDash([9, 9]);
+      ctx.lineDashOffset = -game.time * 50;
+      ctx.beginPath();
+      ctx.moveTo(target.source.x, target.source.y);
+      ctx.lineTo(seat.x, seat.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    if (wants('ghost') && target.source) {
+      ctx.globalAlpha = 0.35;
+      this.drawBucketShape(ctx, seat.x, seat.y, this.bucketSize() * 0.92, target.source.color, 0);
+      ctx.globalAlpha = 1;
+    }
+
+    if (wants('ring')) {
+      const r = size * (0.5 + 0.05 * pulse);
+      ctx.strokeStyle = Util.rgba(color, 0.95);
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(seat.x, seat.y + size * 0.3, r, r * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = Util.rgba(color, 0.28 * pulse);
+      ctx.lineWidth = 11;
+      ctx.stroke();
+    }
+
+    if (wants('arrow')) {
+      const bob = Math.sin(game.time * 5) * 4;
+      const y = seat.y - size * 0.82 - bob;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(seat.x, y + 16);
+      ctx.lineTo(seat.x - 13, y - 5);
+      ctx.lineTo(seat.x + 13, y - 5);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /* ----------------------------------------------------------- buckets */
+
+  drawBuckets(ctx, game, input) {
+    const cs = game.board.cell;
+    const boardSize = cs * 0.8;
+    const beltSize = this.bucketSize();
+
+    // On the board
+    for (const b of game.board.buckets) {
+      if (b.state !== 'board') continue;
+      // A dragged bucket is drawn under the finger instead; an aimed one never
+      // leaves its cell, so it stays here.
+      if (input.dragBucket === b && input.dragging && CONFIG.controls.mode !== 'aim') continue;
+      // A blocked bucket is greyed out rather than faded — the shipped game
+      // desaturates it (LockBasket), and fading washes out on a light board.
+      const dim = CONFIG.indicator.dimUnreachable && !b.collectible;
+      const tint = dim ? Util.mixHex(b.color, '#8fa0b0', 0.72) : b.color;
+      ctx.save();
+      const wob = 1 + Math.sin(b.wobble * Math.PI * 3) * 0.09 * b.wobble;
+      this.drawBucketShadow(ctx, b.x, b.y, boardSize * wob);
+      this.drawBucketShape(ctx, b.x, b.y, boardSize * wob, tint, 0);
+      ctx.restore();
+    }
+
+    // In the air, in slots, and popping
+    for (const b of game.board.buckets) {
+      if (b.state === 'board' || b.state === 'done') continue;
+      let x = b.x, y = b.y, size = beltSize;
+
+      if (b.state === 'slot' || b.state === 'full') {
+        const seat = game.belt.seat(b.slot);
+        x = seat.x; y = seat.y;
+      } else if (b.state === 'travel') {
+        size = boardSize;
+      } else if (b.state === 'jump') {
+        size = Util.lerp(boardSize, beltSize, Util.clamp(b.jumpT, 0, 1));
+      }
+
+      ctx.save();
+      if (b.state === 'slot' || b.state === 'full') ctx.globalAlpha = game.belt.portalAlpha(b.slot.s);
+      if (b.state === 'leaving') ctx.globalAlpha = 1 - Util.clamp(b.popT, 0, 1);
+      const wob = 1 + Math.sin(b.wobble * Math.PI * 3) * 0.1 * b.wobble;
+      this.drawBucketShape(ctx, x, y, size * (b.scale || 1) * wob, b.color, b.visualFill);
+
+      if (b.state === 'slot' || b.state === 'full' || b.state === 'leaving') {
+        const pct = Math.min(100, Math.round((b.state === 'leaving' ? 1 : b.visualFill) * 100));
+        this.drawOutlinedText(ctx, `${pct}%`, x, y + size * 0.56, '800 17px system-ui, sans-serif');
+      }
+      ctx.restore();
+    }
+  }
+
+  drawBucketShadow(ctx, x, y, size) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(70,95,120,0.20)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + size * 0.42, size * 0.36, size * 0.11, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /**
+   * One bucket, drawn as a tapered cup seen slightly from above: coloured
+   * body, lighter rim, dark opening, sand rising inside it.
+   * `fill` is 0..1.
+   */
+  drawBucketShape(ctx, x, y, size, color, fill) {
+    const rx = size * 0.5;
+    const ry = size * 0.17;
+    const h = size * 0.72;
+    const topY = y - h / 2;
+    const botY = y + h / 2;
+    const baseRx = rx * 0.7;
+    const baseRy = ry * 0.72;
+
+    ctx.save();
+
+    // Silhouette: top rim arc, straight walls, rounded base.
+    const body = new Path2D();
+    body.ellipse(x, topY, rx, ry, 0, Math.PI, Math.PI * 2);
+    body.lineTo(x + baseRx, botY);
+    body.ellipse(x, botY, baseRx, baseRy, 0, 0, Math.PI);
+    body.closePath();
+
+    const shade = ctx.createLinearGradient(x - rx, 0, x + rx, 0);
+    shade.addColorStop(0, Util.mixHex(color, '#ffffff', 0.28));
+    shade.addColorStop(0.45, color);
+    shade.addColorStop(1, Util.mixHex(color, '#000000', 0.3));
+    ctx.fillStyle = shade;
+    ctx.fill(body);
+
+    // Rim: the top face of the wall.
+    ctx.beginPath();
+    ctx.ellipse(x, topY, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = Util.mixHex(color, '#ffffff', 0.34);
+    ctx.fill();
+
+    // Opening + the sand inside it.
+    const innerRx = rx * 0.8, innerRy = ry * 0.8;
+    const inner = new Path2D();
+    inner.ellipse(x, topY, innerRx, innerRy, 0, 0, Math.PI * 2);
+    ctx.fillStyle = Util.mixHex(color, '#000000', 0.62);
+    ctx.fill(inner);
+
+    if (fill > 0.001) {
+      ctx.save();
+      ctx.clip(inner);
+      // The sand surface starts as a small mound low in the cup and grows to
+      // fill the whole opening.
+      const grow = Util.clamp(fill * 1.35, 0, 1);
+      const sy = Util.lerp(topY + innerRy * 1.25, topY, Util.easeOutQuad(fill));
+      ctx.beginPath();
+      ctx.ellipse(x, sy, innerRx * Util.lerp(0.5, 1.04, grow), innerRy * Util.lerp(0.5, 1.04, grow),
+        0, 0, Math.PI * 2);
+      ctx.fillStyle = Util.mixHex(color, '#ffffff', 0.12);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Outline
+    ctx.strokeStyle = Util.mixHex(color, '#000000', 0.42);
+    ctx.lineWidth = Math.max(1.5, size * 0.03);
+    ctx.stroke(body);
+
+    ctx.restore();
+  }
+
+  /** White text with a dark outline — the readout style the game uses. */
+  drawOutlinedText(ctx, text, x, y, font) {
+    ctx.save();
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(40,58,76,0.85)';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  /* --------------------------------------------------------- particles */
+
+  drawParticles(ctx, game) {
+    for (const p of game.particles) {
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = 0.9;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ------------------------------------------------------------- drag */
+
+  drawDrag(ctx, game, input) {
+    if (!input.dragBucket || !input.dragging) return;
+    if (CONFIG.controls.mode === 'aim') return;   // aim steers a cursor, not the bucket
+    const b = input.dragBucket;
+    const size = game.board.cell * 0.9;
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    this.drawBucketShadow(ctx, input.pointer.x, input.pointer.y, size);
+    this.drawBucketShape(ctx, input.pointer.x, input.pointer.y, size, b.color, 0);
+    ctx.restore();
+
+    if (input.dragSlot && !input.dragSlot.isFree) {
+      const seat = game.belt.seat(input.dragSlot);
+      ctx.strokeStyle = SKIN.danger;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(seat.x, seat.y, CONFIG.belt.slotSize * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(seat.x - 15, seat.y - 15);
+      ctx.lineTo(seat.x + 15, seat.y + 15);
+      ctx.stroke();
+    }
+  }
+
+  /* -------------------------------------------------------------- hud */
+
+  drawHud(ctx, game) {
+    ctx.save();
+    ctx.font = '800 19px system-ui, sans-serif';
+    ctx.textBaseline = 'top';
+
+    // Kept top-left: the panel's toggle button lives over the top-right.
+    ctx.textAlign = 'left';
+    ctx.fillStyle = SKIN.ink;
+    ctx.fillText(`Buckets ${game.bucketsLeft}`, 26, LAYOUT.hudTop + 2);
+
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillStyle = SKIN.inkSoft;
+    ctx.fillText(`moves ${game.moves}  ·  seed ${CONFIG.level.seed}`, 27, LAYOUT.hudTop + 26);
+
+    if (game.belt.boost) {
+      ctx.textAlign = 'center';
+      ctx.font = '800 22px system-ui, sans-serif';
+      ctx.fillStyle = SKIN.accent;
+      ctx.fillText(`x${CONFIG.belt.boostMultiplier.toFixed(1)}`, WORLD.w / 2, LAYOUT.hudTop + 4);
+    }
+
+    if (game.stalled) {
+      this.drawOutlinedText(ctx, 'NO BUCKET CAN REACH ITS SAND', WORLD.w / 2, LAYOUT.badgeY + 52,
+        '800 16px system-ui, sans-serif');
+    }
+
+    if (game.rejectFlash > 0.01) {
+      ctx.globalAlpha = game.rejectFlash;
+      this.drawOutlinedText(ctx, 'NO FREE SLOT', WORLD.w / 2, LAYOUT.badgeY + 52,
+        '800 18px system-ui, sans-serif');
+      ctx.globalAlpha = 1;
+    }
+
+    if (CONFIG.debug.showStats) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = SKIN.inkSoft;
+      ctx.font = '500 11px ui-monospace, monospace';
+      const lines = [
+        `belt len ${game.belt.path.length.toFixed(0)}  spacing ${game.belt.spacing().toFixed(0)}`,
+        `shape ${CONFIG.belt.shape}  rule ${CONFIG.indicator.rule}`,
+        `control ${CONFIG.controls.mode}  radius ${CONFIG.sand.collectRadius}`,
+        `fps ${game.fps ? game.fps.toFixed(0) : '-'}`,
+      ];
+      lines.forEach((l, i) => ctx.fillText(l, 27, LAYOUT.hudTop + 44 + i * 14));
+    }
+
+    ctx.restore();
+  }
+}
+
+</script>
+
+<script>
+/* ---- js/input.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   Pointer handling — the part of the prototype most likely to be rewritten.
+
+   Four control modes:
+     tap    – the shipped behaviour: tap a bucket, the picker chooses the slot
+     drag   – press a bucket and drop it onto the slot you want
+     hybrid – a tap auto-picks, a drag chooses
+     aim    – the bucket stays on the board; you steer a targeting cursor and
+              a trajectory shows where it will be thrown
+
+   Any gesture can be called off by releasing back over the cell the bucket
+   came from, which stays lit while the rest of the board dims.
+
+   Pressing empty space (or the belt) speeds the belt up while held.
+   ------------------------------------------------------------------------ */
+
+class InputController {
+
+  constructor(canvas, game, view) {
+    this.canvas = canvas;
+    this.game = game;
+    this.view = view;
+
+    this.pointer = { x: 0, y: 0, down: false };
+    this.dragBucket = null;     // bucket the gesture picked up
+    this.dragging = false;      // gesture is live (past the threshold, or aiming)
+    this.dragSlot = null;       // slot the release would land on
+    this.originCell = null;     // cell the bucket came from — the cancel target
+    this.overOrigin = false;    // releasing right now would call the move off
+    this.dragPointIndex = -1;   // belt control point being edited
+    this.pressStart = null;
+    this.boosting = false;
+
+    canvas.addEventListener('pointerdown', e => this.onDown(e));
+    canvas.addEventListener('pointermove', e => this.onMove(e));
+    canvas.addEventListener('pointerup', e => this.onUp(e));
+    canvas.addEventListener('pointercancel', () => this.cancel());
+    canvas.addEventListener('pointerleave', e => this.onLeave(e));
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  /* ------------------------------------------------------------ helpers */
+
+  /** Aim mode keeps the bucket on the board and moves a cursor instead. */
+  get aimMode() { return CONFIG.controls.mode === 'aim'; }
+
+  /** Tap mode never promotes a press into a targeting gesture. */
+  get gesturesAllowed() { return CONFIG.controls.mode !== 'tap'; }
+
+  toWorld(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return this.view.toWorld(e.clientX - rect.left, e.clientY - rect.top);
+  }
+
+  /** Bucket under a world point, if any. */
+  bucketAt(x, y) {
+    const board = this.game.board;
+    const cell = board.worldToCell(x, y);
+    if (!cell) return null;
+    return board.cells[cell.row][cell.col].bucket;
+  }
+
+  /** True when the pointer is back over the cell the bucket was taken from. */
+  isOverOrigin(x, y) {
+    if (!CONFIG.controls.cancelOnOrigin || !this.originCell) return false;
+    const cell = this.game.board.worldToCell(x, y);
+    return !!cell && cell.col === this.originCell.col && cell.row === this.originCell.row;
+  }
+
+  /** Resolve what a release at this point would do. */
+  updateTarget(x, y) {
+    this.overOrigin = this.isOverOrigin(x, y);
+    if (this.overOrigin) { this.dragSlot = null; return; }
+    this.dragSlot = this.game.slotUnderPointer(x, y, CONFIG.controls.dragSnap);
+  }
+
+  nearestBeltPoint(x, y) {
+    let best = -1, bestDist = 26;
+    CONFIG.belt.points.forEach((p, i) => {
+      const d = Util.dist(x, y, p[0], p[1]);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    return best;
+  }
+
+  /* ------------------------------------------------------------- events */
+
+  onDown(e) {
+    this.canvas.setPointerCapture(e.pointerId);
+    const p = this.toWorld(e);
+    this.pointer.x = p.x; this.pointer.y = p.y; this.pointer.down = true;
+    this.pressStart = { x: p.x, y: p.y };
+
+    if (CONFIG.debug.editBelt) {
+      const idx = this.nearestBeltPoint(p.x, p.y);
+      if (idx >= 0) { this.dragPointIndex = idx; return; }
+    }
+
+    const bucket = this.bucketAt(p.x, p.y);
+    if (bucket && bucket.state === 'board') {
+      this.dragBucket = bucket;
+      this.originCell = { col: bucket.col, row: bucket.row };
+      this.overOrigin = false;
+      // Aiming starts on contact: nothing has to move far, the cursor is the
+      // thing being steered. A drag still waits for the threshold so a tap
+      // stays a tap.
+      this.dragging = this.aimMode;
+      if (this.dragging) this.updateTarget(p.x, p.y);
+      if (!bucket.collectible) bucket.wobble = 1;
+      return;
+    }
+
+    // Nothing grabbed: hold to speed the belt up.
+    if (CONFIG.controls.holdToBoost) {
+      this.boosting = true;
+      this.game.belt.boost = true;
+    }
+  }
+
+  onMove(e) {
+    const p = this.toWorld(e);
+    this.pointer.x = p.x; this.pointer.y = p.y;
+
+    if (this.dragPointIndex >= 0) {
+      CONFIG.belt.points[this.dragPointIndex] = [Math.round(p.x), Math.round(p.y)];
+      this.game.belt.refreshPath();
+      return;
+    }
+
+    // Hover feedback drives the predictive indicator on desktop.
+    if (!this.pointer.down) {
+      const hovered = this.bucketAt(p.x, p.y);
+      this.game.hoverBucket = hovered && hovered.state === 'board' ? hovered : null;
+    }
+
+    if (!this.dragBucket) return;
+
+    if (!this.dragging && this.pressStart && this.gesturesAllowed) {
+      const moved = Util.dist(p.x, p.y, this.pressStart.x, this.pressStart.y);
+      if (moved > CONFIG.controls.dragThreshold) this.dragging = true;
+    }
+
+    if (this.dragging) {
+      this.game.hoverBucket = this.dragBucket;
+      this.updateTarget(p.x, p.y);
+    }
+  }
+
+  onUp(e) {
+    const p = this.toWorld(e);
+    this.pointer.x = p.x; this.pointer.y = p.y;
+    this.pointer.down = false;
+
+    if (this.dragPointIndex >= 0) { this.dragPointIndex = -1; this.pressStart = null; return; }
+
+    if (this.boosting) {
+      this.boosting = false;
+      this.game.belt.boost = false;
+    }
+
+    const bucket = this.dragBucket;
+    const wasDragging = this.dragging;
+    const wasAiming = this.aimMode;
+    const slot = this.dragSlot;
+    const cancelled = this.overOrigin;
+    this.dragBucket = null;
+    this.dragging = false;
+    this.dragSlot = null;
+    this.originCell = null;
+    this.overOrigin = false;
+    this.pressStart = null;
+
+    if (!bucket) return;
+
+    if (wasDragging) {
+      // Released over the cell it came from: put it back, nothing happens.
+      if (cancelled) { bucket.wobble = 1; this.game.onToast('Move cancelled'); return; }
+
+      // Where the flight starts is the whole difference between the schemes:
+      // a dragged bucket leaves from the finger, an aimed one from its cell.
+      const from = wasAiming
+        ? this.game.board.cellCenter(bucket.col, bucket.row)
+        : { x: p.x, y: p.y };
+
+      if (slot && slot.isFree) { this.commit(bucket, slot, from); return; }
+      if (slot && !slot.isFree) { this.game.onToast('That slot is taken'); bucket.wobble = 1; return; }
+      if (CONFIG.controls.dragFallbackAuto) { this.commit(bucket, null, from); return; }
+      this.game.onToast(wasAiming ? 'Aim at a free slot' : 'Drop it on a free slot');
+      return;
+    }
+
+    // A plain tap: the shipped walk-the-corridor move.
+    if (CONFIG.controls.mode === 'drag') {
+      if (CONFIG.controls.dragFallbackAuto) this.commit(bucket, null);
+      else this.game.onToast('Drag the bucket onto a slot');
+      return;
+    }
+    this.commit(bucket, null);
+  }
+
+  onLeave() {
+    if (!this.pointer.down) this.game.hoverBucket = null;
+  }
+
+  cancel() {
+    this.dragBucket = null;
+    this.dragging = false;
+    this.dragSlot = null;
+    this.originCell = null;
+    this.overOrigin = false;
+    this.dragPointIndex = -1;
+    this.pointer.down = false;
+    if (this.boosting) { this.boosting = false; this.game.belt.boost = false; }
+  }
+
+  /* ------------------------------------------------------------- commit */
+
+  commit(bucket, slot, flightFrom) {
+    const reason = this.game.place(bucket, slot, flightFrom);
+    if (!reason) return;
+    if (reason === 'nofreeslot') this.game.onToast('No free slot — wait for one to clear');
+    else if (reason === 'blocked') this.game.onToast('That bucket is blocked');
+  }
+}
+
+</script>
+
+<script>
+/* ---- js/ui.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   The tuning panel. Every control is generated from CONFIG_SCHEMA, so a new
+   knob is one default in config.js plus one schema line — no DOM work.
+   ------------------------------------------------------------------------ */
+
+class Panel {
+
+  constructor(game, hooks) {
+    this.game = game;
+    this.hooks = hooks;
+    this.inputs = [];
+    this.build();
+    this.wireButtons();
+  }
+
+  build() {
+    const host = document.getElementById('panel-groups');
+    host.innerHTML = '';
+    this.inputs = [];
+
+    for (const group of CONFIG_SCHEMA) {
+      const details = document.createElement('details');
+      details.className = 'group';
+      if (group.open) details.open = true;
+
+      const summary = document.createElement('summary');
+      summary.textContent = group.label;
+      details.appendChild(summary);
+
+      const body = document.createElement('div');
+      body.className = 'group-body';
+      for (const field of group.fields) body.appendChild(this.buildField(field));
+      details.appendChild(body);
+      host.appendChild(details);
+    }
+  }
+
+  buildField(field) {
+    const wrap = document.createElement('div');
+    wrap.className = 'field' + (field.type === 'toggle' ? ' toggle' : '');
+
+    // An action rather than a value: no config path, no label row, and
+    // nothing for refresh() to push back into.
+    if (field.type === 'button') {
+      const btn = document.createElement('button');
+      btn.textContent = field.label;
+      btn.addEventListener('click', () => {
+        const fn = this.hooks[field.hook];
+        if (fn) fn();
+      });
+      wrap.appendChild(btn);
+      if (field.desc) {
+        const desc = document.createElement('div');
+        desc.className = 'desc';
+        desc.textContent = field.desc;
+        wrap.appendChild(desc);
+      }
+      return wrap;
+    }
+
+    const label = document.createElement('label');
+    const name = document.createElement('span');
+    name.textContent = field.label;
+    label.appendChild(name);
+
+    const value = Util.getPath(CONFIG, field.k);
+    let input;
+
+    if (field.type === 'range') {
+      const val = document.createElement('span');
+      val.className = 'val';
+      label.appendChild(val);
+      wrap.appendChild(label);
+
+      input = document.createElement('input');
+      input.type = 'range';
+      input.min = field.min; input.max = field.max; input.step = field.step;
+      input.value = value;
+      const show = () => { val.textContent = this.formatValue(field, Number(input.value)); };
+      show();
+      input.addEventListener('input', () => {
+        Util.setPath(CONFIG, field.k, Number(input.value));
+        show();
+        this.applyChange(field);
+      });
+      wrap.appendChild(input);
+
+    } else if (field.type === 'select') {
+      wrap.appendChild(label);
+      input = document.createElement('select');
+      const options = typeof field.options === 'function' ? field.options() : field.options;
+      for (const opt of options) {
+        const o = document.createElement('option');
+        o.value = String(opt.v);
+        o.textContent = opt.label;
+        input.appendChild(o);
+      }
+      input.value = String(value);
+      input.addEventListener('change', () => {
+        const cast = field.cast || (v => v);
+        Util.setPath(CONFIG, field.k, cast(input.value));
+        this.applyChange(field);
+      });
+      wrap.appendChild(input);
+
+    } else if (field.type === 'toggle') {
+      input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!value;
+      label.appendChild(input);
+      wrap.appendChild(label);
+      input.addEventListener('change', () => {
+        Util.setPath(CONFIG, field.k, input.checked);
+        this.applyChange(field);
+      });
+
+    } else { // number
+      wrap.appendChild(label);
+      input = document.createElement('input');
+      input.type = 'number';
+      input.value = value;
+      input.addEventListener('change', () => {
+        Util.setPath(CONFIG, field.k, Number(input.value));
+        this.applyChange(field);
+      });
+      wrap.appendChild(input);
+    }
+
+    if (field.desc) {
+      const desc = document.createElement('div');
+      desc.className = 'desc';
+      desc.textContent = field.desc;
+      wrap.appendChild(desc);
+    }
+
+    this.inputs.push({ field, input });
+    return wrap;
+  }
+
+  formatValue(field, v) {
+    const decimals = String(field.step).includes('.') ? String(field.step).split('.')[1].length : 0;
+    return v.toFixed(decimals) + (field.unit || '');
+  }
+
+  applyChange(field) {
+    if (field.apply === 'belt') this.hooks.onBeltShape();
+    else if (field.apply === 'slots') this.hooks.onSlots();
+    else if (field.apply === 'level') this.hooks.onLevel();
+  }
+
+  /** Push current CONFIG values back into the widgets (after load / reset). */
+  refresh() {
+    for (const { field, input } of this.inputs) {
+      const value = Util.getPath(CONFIG, field.k);
+      if (field.type === 'toggle') input.checked = !!value;
+      else input.value = String(value);
+      if (field.type === 'range') {
+        const val = input.parentElement.querySelector('.val');
+        if (val) val.textContent = this.formatValue(field, Number(value));
+      }
+    }
+  }
+
+  wireButtons() {
+    const h = this.hooks;
+    document.getElementById('btn-restart').onclick = () => h.onRestart();
+    document.getElementById('btn-new').onclick = () => h.onNewLevel();
+    document.getElementById('btn-addslot').onclick = () => h.onAddSlot();
+    document.getElementById('btn-copy').onclick = () => h.onCopy();
+    document.getElementById('btn-save').onclick = () => h.onSave();
+    document.getElementById('btn-load').onclick = () => h.onLoad();
+    document.getElementById('btn-reset').onclick = () => h.onReset();
+
+    const panel = document.getElementById('panel');
+    document.getElementById('panel-toggle').onclick = () => panel.classList.toggle('hidden');
+  }
+}
+
+/** Bottom-of-screen message. */
+function showToast(text) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => el.classList.remove('show'), 1400);
+}
+
+</script>
+
+<script>
+/* ---- js/main.js ---- */
+'use strict';
+
+/* ------------------------------------------------------------------------
+   Bootstrap: canvas sizing, the frame loop, and the wiring between the
+   panel, the input layer and the game.
+   ------------------------------------------------------------------------ */
+
+(function main() {
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  /** Letterboxes the WORLD rect into the canvas and converts screen -> world. */
+  const view = {
+    scale: 1, ox: 0, oy: 0, dpr: 1,
+    resize() {
+      const rect = canvas.getBoundingClientRect();
+      this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, Math.round(rect.width * this.dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * this.dpr));
+      this.scale = Math.min(rect.width / WORLD.w, rect.height / WORLD.h);
+      this.ox = (rect.width - WORLD.w * this.scale) / 2;
+      this.oy = (rect.height - WORLD.h * this.scale) / 2;
+    },
+    apply() {
+      ctx.setTransform(this.scale * this.dpr, 0, 0, this.scale * this.dpr,
+        this.ox * this.dpr, this.oy * this.dpr);
+    },
+    /** Wipe the whole backing store, letterbox bars included. */
+    clear() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = '#1d2833';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    },
+    toWorld(px, py) {
+      return { x: (px - this.ox) / this.scale, y: (py - this.oy) / this.scale };
+    },
+  };
+
+  restoreConfig();
+
+  const game = new Game();
+  const renderer = new Renderer(ctx);
+  const input = new InputController(canvas, game, view);
+
+  game.onToast = showToast;
+
+  const panel = new Panel(game, {
+    onBeltShape: () => { game.belt.setShape(CONFIG.belt.shape); game.belt.rebuildSlots(); },
+    onSlots: () => { game.setSlotCount(); },
+    onLevel: () => { game.rebuildBoard(); },
+    onRestart: () => { game.restart(); hideOverlay(); },
+    onNewLevel: () => { game.randomLevel(); panel.refresh(); hideOverlay(); },
+    onAddSlot: () => { game.addSlot(); panel.refresh(); },
+    onFirework: () => {
+      showToast(game.firework.fireNow() ? 'Firework away' : 'Already firing');
+    },
+    onCopy: () => copyConfig(),
+    onSave: () => {
+      try {
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(CONFIG));
+        showToast('Config saved');
+      } catch (err) {
+        // Private browsing and locked-down webviews both refuse to write.
+        console.warn('Could not save config', err);
+        showToast('Storage blocked in this browser');
+      }
+    },
+    onLoad: () => {
+      if (!restoreConfig()) { showToast('Nothing saved yet'); return; }
+      game.belt.refreshPath();   // keep any hand-edited points from the save
+      game.newLevel(CONFIG.level.seed);
+      panel.refresh();
+      hideOverlay();
+      showToast('Config loaded');
+    },
+    onReset: () => {
+      Object.keys(CONFIG).forEach(k => delete CONFIG[k]);
+      Object.assign(CONFIG, Util.clone(DEFAULT_CONFIG));
+      game.belt.setShape(CONFIG.belt.shape);
+      game.newLevel(CONFIG.level.seed);
+      panel.refresh();
+      hideOverlay();
+      showToast('Defaults restored');
+    },
+  });
+
+  function restoreConfig() {
+    try {
+      const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+      if (!raw) return false;
+      const saved = JSON.parse(raw);
+      // Merge so configs saved before a new knob existed still load.
+      for (const group of Object.keys(DEFAULT_CONFIG)) {
+        if (!saved[group]) continue;
+        CONFIG[group] = Object.assign({}, DEFAULT_CONFIG[group], saved[group]);
+      }
+      if (saved.belt && saved.belt.points) CONFIG.belt.points = saved.belt.points;
+      return true;
+    } catch (err) {
+      console.warn('Could not restore config', err);
+      return false;
+    }
+  }
+
+  function copyConfig() {
+    const text = JSON.stringify(CONFIG, null, 2);
+    console.log(text);
+    if (!navigator.clipboard) { showToast('Config logged to the console'); return; }
+    navigator.clipboard.writeText(text).then(
+      () => showToast('Config copied'),
+      () => showToast('Clipboard blocked — logged to the console'));
+  }
+
+  /* -------------------------------------------------------------- overlay */
+
+  const overlay = document.getElementById('overlay');
+  function showOverlay(title, sub, btn) {
+    document.getElementById('overlay-title').textContent = title;
+    document.getElementById('overlay-sub').textContent = sub;
+    document.getElementById('overlay-btn').textContent = btn;
+    overlay.classList.remove('hidden');
+  }
+  function hideOverlay() { overlay.classList.add('hidden'); }
+  document.getElementById('overlay-btn').onclick = () => {
+    game.randomLevel();
+    panel.refresh();
+    hideOverlay();
+  };
+
+  /* ----------------------------------------------------------------- loop */
+
+  let last = performance.now();
+  let overlayShown = false;
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    game.fps = game.fps ? Util.lerp(game.fps, 1 / Math.max(dt, 0.0001), 0.08) : 60;
+
+    if (game.state === 'playing') {
+      game.update(dt);
+      game.board.refreshReachable();
+      overlayShown = false;
+    } else {
+      // Keep the belt alive behind the win card — and let a firework that is
+      // still in the air finish, in case it was what cleared the last bucket.
+      game.belt.update(dt);
+      game.firework.update(dt);
+      if (!overlayShown) {
+        overlayShown = true;
+        showOverlay('Level complete', `${game.cleared} buckets cleared in ${game.moves} moves.`, 'Next level');
+      }
+    }
+
+    view.clear();
+    view.apply();
+    renderer.draw(game, view, input);
+    requestAnimationFrame(frame);
+  }
+
+  /* ------------------------------------------------------------ shortcuts */
+
+  const cycle = (path, values) => {
+    const cur = Util.getPath(CONFIG, path);
+    const next = values[(values.indexOf(cur) + 1) % values.length];
+    Util.setPath(CONFIG, path, next);
+    panel.refresh();
+    return next;
+  };
+
+  window.addEventListener('keydown', e => {
+    if (e.target && /input|select|textarea/i.test(e.target.tagName)) return;
+
+    if (e.code === 'Space') {
+      if (!game.belt.boost) game.belt.boost = true;
+      e.preventDefault();
+      return;
+    }
+
+    const shapes = Object.keys(BELT_SHAPES);
+    const num = Number(e.key);
+    if (num >= 1 && num <= shapes.length) {
+      CONFIG.belt.shape = shapes[num - 1];
+      game.belt.setShape(CONFIG.belt.shape);
+      game.belt.rebuildSlots();
+      panel.refresh();
+      showToast(BELT_SHAPES[CONFIG.belt.shape].label);
+      return;
+    }
+
+    switch (e.key.toLowerCase()) {
+      case 'r': game.restart(); hideOverlay(); showToast('Restarted'); break;
+      case 'n': game.randomLevel(); panel.refresh(); hideOverlay(); break;
+      case 's': game.addSlot(); panel.refresh(); break;
+      case 'f': showToast(game.firework.fireNow() ? 'Firework away' : 'Already firing'); break;
+      case 'c': showToast('Controls: ' + cycle('controls.mode', ['tap', 'drag', 'hybrid', 'aim'])); break;
+      case 'i': showToast('Indicator: ' + cycle('indicator.mode', ['off', 'predictive', 'committed', 'both'])); break;
+      case 'k': showToast('Picker: ' + cycle('indicator.rule',
+        ['nearestToAnchor', 'firstInTravel', 'lastInTravel', 'nearestToExit'])); break;
+      case 'p': document.getElementById('panel').classList.toggle('hidden'); view.resize(); break;
+      default: break;
+    }
+  });
+
+  window.addEventListener('keyup', e => {
+    if (e.code === 'Space' && !input.boosting) game.belt.boost = false;
+  });
+
+  window.addEventListener('resize', () => view.resize());
+  window.addEventListener('orientationchange', () => setTimeout(() => view.resize(), 120));
+
+  // On a phone the tools start out of the way; the gear button brings them up.
+  if (window.matchMedia('(max-width: 780px)').matches) {
+    document.getElementById('panel').classList.add('hidden');
+  }
+
+  view.resize();
+  requestAnimationFrame(frame);
+
+  // Handy for poking at the prototype from the console.
+  window.SL = { game, CONFIG, view, input, renderer, panel, BELT_SHAPES, showToast };
+})();
+
+</script>
 </body>
 </html>
