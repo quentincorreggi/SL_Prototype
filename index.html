@@ -36,6 +36,12 @@
     transition:transform 0.18s;display:flex;align-items:center;gap:10px}
   .ls-editor-btn:hover{transform:scale(1.06)}.ls-editor-btn:active{transform:scale(0.94)}
   .ls-play-btn{background:linear-gradient(135deg,#4EE68C,#36C76E);box-shadow:0 6px 22px rgba(78,230,140,0.35)}
+  .ls-streak-btn{background:linear-gradient(135deg,#FFB03A,#F2622E);box-shadow:0 6px 22px rgba(242,98,46,0.35)}
+  .ls-toggle-btn{padding:10px 22px;border:none;border-radius:14px;cursor:pointer;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:#5A4A38;
+    background:rgba(255,255,255,0.6);box-shadow:0 3px 12px rgba(0,0,0,0.12);opacity:0.62}
+  .ls-toggle-btn:hover{background:rgba(255,255,255,0.85)}
+  .ls-note{max-width:380px;text-align:center;font-size:12px;line-height:1.5;color:#9C8A70;font-style:italic}
 
   /* === Calibration === */
   #cal-toggle{position:absolute;top:10px;right:10px;z-index:30;width:40px;height:40px;border-radius:12px;border:none;
@@ -273,8 +279,12 @@
     <div class="ls-sub">Tap an active bucket &middot; it rides the belt and pulls matching sand</div>
   </div>
   <div class="ls-actions">
+    <button class="ls-editor-btn ls-streak-btn" onclick="startStreakDemo()"><span style="font-size:22px">&#127882;</span> Streak Split Demo</button>
     <button class="ls-editor-btn ls-play-btn" onclick="startDemo()"><span style="font-size:22px">&#9654;</span> Play Demo</button>
     <button class="ls-editor-btn" onclick="showEditor()"><span style="font-size:22px">&#9998;</span> Level Editor</button>
+    <button id="streak-btn" class="ls-toggle-btn" onclick="toggleStreakFirework()">&#127882; Streak Boost: OFF</button>
+    <div class="ls-note">Streak boost on = one firework rocket fires at level start, splits in two,
+      and each half destroys a bucket plus the sand it was going to collect.</div>
   </div>
 </div>
 
@@ -285,6 +295,7 @@
     <input id="ed-name" type="text" value="Custom Level" maxlength="40" oninput="editorSetName(this.value)" placeholder="Name">
     <input id="ed-desc" type="text" value="My custom level" maxlength="60" oninput="editorSetDesc(this.value)" placeholder="Description">
     <div class="ed-top-actions">
+      <button id="ed-streak-btn" class="ed-action" onclick="toggleStreakFirework()" style="opacity:0.62">&#127882; Streak: OFF</button>
       <button id="ed-test-play" class="ed-action play" onclick="editorTestPlay()">&#9654; Test Play</button>
       <button class="ed-action export" onclick="editorExportJSON()">&#128203; Export</button>
       <button class="ed-action import" onclick="editorImportJSON()">&#128229; Import</button>
@@ -358,6 +369,7 @@
 <script src="js/belt.js"></script>
 <script src="js/sand.js"></script>
 <script src="js/bucket_attraction.js"></script>
+<script src="js/firework.js"></script>
 <script src="js/tunnel.js"></script>
 <script src="js/wall.js"></script>
 <script src="js/rendering.js"></script>

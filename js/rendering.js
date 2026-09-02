@@ -43,6 +43,7 @@ function drawFrame() {
   drawGrid();
   drawJumpers();
   drawTrails();
+  if (typeof drawFireworks === 'function') drawFireworks();
   if (typeof drawParticles === 'function') drawParticles();
 }
 

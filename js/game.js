@@ -59,6 +59,9 @@ function initGame(levelData) {
   computeLevelCapacities();
   updateTunnels();
   updateBucketActivation();
+  // Streak reward: fires a moment after the board appears (no-op if the
+  // player's streak isn't active).
+  if (typeof startStreakFirework === 'function') startStreakFirework();
   showQuitBtn();
 }
 
@@ -212,6 +215,9 @@ function tunnelTargetIndex(idx, dir) {
 function handleTap(sx, sy) {
   if (won || !gameActive) return;
   if (!L.grid) return;
+  // Input is locked while the streak firework show runs, so a tap can
+  // never land between a shell picking its target and detonating on it.
+  if (typeof fireworkBusy === 'function' && fireworkBusy()) return;
   // Hit-test the grid.
   var cs = L.grid.cell;
   if (sx < L.grid.x || sx > L.grid.x + L.grid.w) return;
@@ -291,6 +297,7 @@ function updateRejectShake() {
 function update() {
   tick++;
   if (!gameActive) return;
+  if (typeof updateFirework === 'function') updateFirework();
   updateBelt();
   updateJumpers();
   updateRejectShake();

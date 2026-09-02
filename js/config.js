@@ -60,6 +60,28 @@ var JUMPER_FRAMES = 24;        // duration of grid→belt arc
 // === GRID ===
 var GRID_W = 7, GRID_H = 7;
 
+// === STREAK FIREWORK (core meta reward, not a level piece) ===
+// If the player's streak is active when a level starts, one rocket
+// auto-launches, splits into FIREWORK_SHELLS shells, and each shell
+// destroys one bucket plus exactly the sand that bucket was going to
+// collect. See firework.js.
+var streakFireworkActive = false;    // set by the meta layer / debug toggle
+var FIREWORK_SHELLS = 2;             // how many smaller fireworks the rocket splits into
+var FIREWORK_LAUNCH_DELAY = 40;      // frames after level start before the rocket fires
+var FIREWORK_RISE_FRAMES = 42;       // rocket climb duration
+var FIREWORK_SHELL_FRAMES = 34;      // shell dive duration
+var FIREWORK_SHELL_STAGGER = 9;      // frames between shell impacts (double-crackle)
+// Row preference for targets — middle rows first, front row last, so the
+// reward bites into the middle of the level and not the first moves.
+var FIREWORK_ROW_PREF = [3, 4, 2, 5, 1, 6, 0];
+
+var fireworkQueued = 0;              // frames until launch (0 = idle)
+var fireworkRocket = null;           // the rising rocket
+var fireworkShells = [];             // shells diving toward their buckets
+var fireworkStreamers = [];          // bucket → sand-hole link lines
+var fireworkBlasts = [];             // expanding flash rings
+var fireworkLabelT = 0;              // "STREAK BONUS!" label timer
+
 // === COLOR PALETTE (sand + buckets share the palette) ===
 // 12-color palette. Light/dark/glow are derived from the base hex so a
 // future palette change only needs the base list.
