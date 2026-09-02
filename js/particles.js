@@ -24,9 +24,13 @@ function spawnConfetti(x, y, n) {
 function tickParticles() {
   for (var i = particles.length - 1; i >= 0; i--) {
     var p = particles[i];
-    p.x += p.vx; p.y += p.vy;
-    p.vy += p.grav ? 0.2 * S : 0.08 * S;
-    p.life -= p.decay; p.r *= 0.985;
+    // p.ts — optional per-particle time scale, so slow-motion effects
+    // (see firework.js) drift and fade in step with the animation that
+    // spawned them. Absent = normal speed.
+    var ts = p.ts || 1;
+    p.x += p.vx * ts; p.y += p.vy * ts;
+    p.vy += (p.grav ? 0.2 * S : 0.08 * S) * ts;
+    p.life -= p.decay * ts; p.r *= (1 - 0.015 * ts);
     if (p.life <= 0) particles.splice(i, 1);
   }
 }
