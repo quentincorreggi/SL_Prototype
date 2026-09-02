@@ -82,6 +82,13 @@ are full, the tap is rejected with a small shake and audio cue.
 
 ### File Map
 
+> **On this branch:** `index.html` is the single-file "Core Gameplay Prototype"
+> (its own `WORLD`/`CONFIG`/`Renderer` architecture, all modules inlined as
+> `<script>` blocks, tuning panel generated from `CONFIG_SCHEMA`). The streak
+> firework lives in its `js/firework.js` block. The earlier multi-file
+> prototype described below is kept at `prototype-v1-grid.html` and still
+> loads the `js/*.js` files.
+
 | File | Purpose |
 |------|---------|
 | `index.html` | Entry point, loads all JS in order, CSS + HTML |
