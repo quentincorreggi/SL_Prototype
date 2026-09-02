@@ -56,6 +56,9 @@
   .cal-row label .v{background:rgba(123,82,160,0.18);color:#7B52A0;padding:1px 8px;border-radius:8px;font-size:11px;font-weight:700}
   .cal-row input[type=range]{width:100%;accent-color:#7B52A0}
   .cal-row .hint{font-size:10px;color:#9C8A70;font-style:italic}
+  .cal-btn{padding:8px 12px;border:none;border-radius:10px;cursor:pointer;font-family:'Fredoka',sans-serif;
+    font-weight:700;font-size:13px;color:#6B4A12;background:linear-gradient(135deg,#FFE08A,#FFB03A)}
+  .cal-btn:hover{filter:brightness(1.06)}.cal-btn:active{transform:scale(0.96)}
 
   /* === Quit button (visible during gameplay only) === */
   #quit-btn{display:none;position:absolute;top:10px;left:10px;z-index:30;
@@ -270,6 +273,22 @@
     <label>Sand CA interval <span class="v" id="cal-sandint-v">2</span></label>
     <input id="cal-sandint" type="range" min="1" max="10" step="1" value="2">
     <div class="hint">How often the falling-sand physics ticks (in render frames). 1&nbsp;=&nbsp;every frame (snappiest), higher&nbsp;=&nbsp;slower, heavier feel.</div>
+  </div>
+
+  <h3>Streak Firework</h3>
+  <div class="cal-row">
+    <label>Firework speed <span class="v" id="cal-fw-speed-v">0.35&times;</span></label>
+    <input id="cal-fw-speed" type="range" min="5" max="150" step="5" value="35">
+    <div class="hint">Playback speed of the whole show — rocket, shells, blasts and sparks together. 1.0&times;&nbsp;=&nbsp;full speed, 0.35&times;&nbsp;=&nbsp;slow enough to follow every stage.</div>
+  </div>
+  <div class="cal-row">
+    <label>Shells <span class="v" id="cal-fw-shells-v">2</span></label>
+    <input id="cal-fw-shells" type="range" min="1" max="5" step="1" value="2">
+    <div class="hint">How many smaller fireworks the rocket splits into. Each one destroys one bucket plus the sand it was going to collect.</div>
+  </div>
+  <div class="cal-row">
+    <button class="cal-btn" onclick="replayStreakFirework()">&#127882; Fire again</button>
+    <div class="hint">Replays the show on the current board at the chosen speed. It really does destroy more buckets each time.</div>
   </div>
 </div>
 

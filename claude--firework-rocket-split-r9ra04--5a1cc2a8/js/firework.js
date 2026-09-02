@@ -37,7 +37,19 @@ function resetFirework() {
   fireworkShells = [];
   fireworkStreamers = [];
   fireworkBlasts = [];
+  fireworkGhosts = [];
   fireworkLabelT = 0;
+}
+
+// Every firework timer advances by this instead of 1 frame, so the whole
+// show slows down or speeds up together (debug panel → Firework speed).
+function fwStep() {
+  var v = fireworkSpeed;
+  // Never fully freeze: input stays locked until the show resolves, so a
+  // speed of 0 (only reachable from the console — the slider floor is
+  // 0.05) would otherwise wedge the level.
+  if (!(v > 0.02)) return 0.02;
+  return v;
 }
 
 // Called at the end of initGame. No-op unless the streak is active.
@@ -45,6 +57,14 @@ function startStreakFirework() {
   resetFirework();
   if (!streakFireworkActive) return;
   fireworkQueued = FIREWORK_LAUNCH_DELAY;
+}
+
+// Debug panel → "Fire again". Replays the show on the board as it stands
+// now, so the speed slider can be judged without restarting the level.
+function replayStreakFirework() {
+  if (!gameActive || won) return;
+  if (fireworkBusy()) return;
+  fireworkQueued = 6;
 }
 
 // True while the show is running — blocks taps.
@@ -150,7 +170,7 @@ function fireworkVaporizeSand(ci, count) {
       particles.push({
         x: px, y: py, vx: Math.cos(a) * sp * S, vy: Math.sin(a) * sp * S - 1.5 * S,
         r: (1.5 + Math.random() * 2.5) * S, color: COLORS[ci].fill,
-        life: 1, decay: 0.02 + Math.random() * 0.02, grav: true
+        life: 1, decay: 0.02 + Math.random() * 0.02, grav: true, ts: fireworkSpeed
       });
     }
   }
@@ -166,9 +186,10 @@ function fireworkVaporizeSand(ci, count) {
 // ============================================================
 
 function updateFirework() {
-  if (fireworkLabelT > 0) fireworkLabelT--;
+  if (fireworkLabelT > 0) fireworkLabelT -= fwStep();
   updateFireworkBlasts();
   updateFireworkStreamers();
+  updateFireworkGhosts();
 
   if (fireworkQueued > 0) {
     fireworkQueued--;
@@ -199,14 +220,16 @@ function launchFireworkRocket() {
 function updateFireworkRocket() {
   var rk = fireworkRocket;
   if (!rk) return;
-  rk.t++;
+  rk.t += fwStep();
   var u = Math.min(1, rk.t / rk.dur);
   var e = 1 - (1 - u) * (1 - u);           // decelerate toward the apex
   rk.y = rk.fromY + (rk.apexY - rk.fromY) * e;
   rk.x = W / 2 + Math.sin(rk.t * 0.35) * 3 * S;
 
-  // Spark trail
+  // Spark trail — spawn rate follows the playback speed so a slowed
+  // rocket doesn't leave a solid wall of sparks behind it.
   for (var i = 0; i < 2; i++) {
+    if (Math.random() > Math.min(1, fireworkSpeed + 0.25)) continue;
     particles.push({
       x: rk.x + (Math.random() - 0.5) * 5 * S,
       y: rk.y + 8 * S + Math.random() * 6 * S,
@@ -214,7 +237,7 @@ function updateFireworkRocket() {
       vy: (1 + Math.random() * 1.5) * S,
       r: (1 + Math.random() * 2) * S,
       color: Math.random() < 0.5 ? '#FFF6D0' : '#FFC741',
-      life: 1, decay: 0.05 + Math.random() * 0.04, grav: false
+      life: 1, decay: 0.05 + Math.random() * 0.04, grav: false, ts: fireworkSpeed
     });
   }
 
@@ -255,22 +278,24 @@ function splitFireworkRocket(rk) {
 function updateFireworkShells() {
   for (var i = fireworkShells.length - 1; i >= 0; i--) {
     var sh = fireworkShells[i];
-    if (sh.delay > 0) { sh.delay--; continue; }
-    sh.t++;
+    if (sh.delay > 0) { sh.delay -= fwStep(); continue; }
+    sh.t += fwStep();
     var u = Math.min(1, sh.t / sh.dur);
     var iu = 1 - u;
     sh.x = iu * iu * sh.fromX + 2 * iu * u * sh.ctrlX + u * u * sh.toX;
     sh.y = iu * iu * sh.fromY + 2 * iu * u * sh.ctrlY + u * u * sh.toY;
 
     // Glitter tail
-    particles.push({
-      x: sh.x, y: sh.y,
-      vx: (Math.random() - 0.5) * 1.5 * S,
-      vy: (Math.random() - 0.5) * 1.5 * S,
-      r: (1 + Math.random() * 2) * S,
-      color: COLORS[sh.ci].light,
-      life: 1, decay: 0.06, grav: false
-    });
+    if (Math.random() <= Math.min(1, fireworkSpeed + 0.25)) {
+      particles.push({
+        x: sh.x, y: sh.y,
+        vx: (Math.random() - 0.5) * 1.5 * S,
+        vy: (Math.random() - 0.5) * 1.5 * S,
+        r: (1 + Math.random() * 2) * S,
+        color: COLORS[sh.ci].light,
+        life: 1, decay: 0.06, grav: false, ts: fireworkSpeed
+      });
+    }
 
     if (sh.t >= sh.dur) {
       detonateFireworkShell(sh);
@@ -292,19 +317,27 @@ function detonateFireworkShell(sh) {
   }
 
   var ci = cell.ci;
+  var pad = 3 * S;
+  var cs = L.grid.cell;
   stock[sh.idx] = null;
   var sandPos = fireworkVaporizeSand(ci, levelCapacities[ci] || 0);
 
-  // Bucket blast
+  // Bucket blast — plus a ghost of the jar that just died, blowing up
+  // and fading out of its cell so you can see WHICH bucket was hit.
+  fireworkGhosts.push({
+    x: sh.toX - (cs - pad * 2) / 2, y: sh.toY - (cs - pad * 2) / 2,
+    w: cs - pad * 2, h: cs - pad * 2,
+    ci: ci, t: 0, dur: 26
+  });
   fireworkFlower(sh.toX, sh.toY, ci, 26);
-  fireworkBlasts.push({ x: sh.toX, y: sh.toY, r: L.grid.cell * 0.75, ci: ci, t: 0, dur: 20 });
+  fireworkBlasts.push({ x: sh.toX, y: sh.toY, r: cs * 0.75, ci: ci, t: 0, dur: 24 });
 
   // Sand blast + the streamer that links the two
   if (sandPos) {
     fireworkFlower(sandPos.x, sandPos.y, ci, 22);
     fireworkStreamers.push({
       x1: sh.toX, y1: sh.toY, x2: sandPos.x, y2: sandPos.y,
-      ci: ci, t: 0, dur: 20
+      ci: ci, t: 0, dur: 34
     });
   }
 
@@ -325,22 +358,29 @@ function fireworkFlower(x, y, ci, n) {
       vx: Math.cos(a) * sp * S, vy: Math.sin(a) * sp * S - 1.5 * S,
       r: (2 + Math.random() * 3) * S,
       color: (i % 3 === 0) ? '#FFFDF0' : (i % 3 === 1 ? COLORS[ci].fill : COLORS[ci].light),
-      life: 1, decay: 0.012 + Math.random() * 0.012, grav: true
+      life: 1, decay: 0.012 + Math.random() * 0.012, grav: true, ts: fireworkSpeed
     });
   }
 }
 
 function updateFireworkBlasts() {
   for (var i = fireworkBlasts.length - 1; i >= 0; i--) {
-    fireworkBlasts[i].t++;
+    fireworkBlasts[i].t += fwStep();
     if (fireworkBlasts[i].t >= fireworkBlasts[i].dur) fireworkBlasts.splice(i, 1);
   }
 }
 
 function updateFireworkStreamers() {
   for (var i = fireworkStreamers.length - 1; i >= 0; i--) {
-    fireworkStreamers[i].t++;
+    fireworkStreamers[i].t += fwStep();
     if (fireworkStreamers[i].t >= fireworkStreamers[i].dur) fireworkStreamers.splice(i, 1);
+  }
+}
+
+function updateFireworkGhosts() {
+  for (var i = fireworkGhosts.length - 1; i >= 0; i--) {
+    fireworkGhosts[i].t += fwStep();
+    if (fireworkGhosts[i].t >= fireworkGhosts[i].dur) fireworkGhosts.splice(i, 1);
   }
 }
 
@@ -349,6 +389,7 @@ function updateFireworkStreamers() {
 // ============================================================
 
 function drawFireworks() {
+  drawFireworkGhosts();
   drawFireworkStreamers();
   drawFireworkBlasts();
   drawFireworkRocket();
@@ -356,10 +397,27 @@ function drawFireworks() {
   drawFireworkLabel();
 }
 
+// The destroyed jar, swelling and fading where it used to sit.
+function drawFireworkGhosts() {
+  for (var i = 0; i < fireworkGhosts.length; i++) {
+    var g = fireworkGhosts[i];
+    var u = g.t / g.dur;
+    var sc = 1 + u * 0.55;
+    var cx = g.x + g.w / 2, cy = g.y + g.h / 2;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - u);
+    ctx.translate(cx, cy);
+    ctx.scale(sc, sc);
+    ctx.translate(-cx, -cy);
+    drawJar(ctx, g.x, g.y, g.w, g.h, g.ci, S, 0, 0);
+    ctx.restore();
+  }
+}
+
 function drawFireworkRocket() {
   var rk = fireworkRocket;
   if (!rk) return;
-  var bw = 7 * S, bh = 20 * S;
+  var bw = 10 * S, bh = 28 * S;
   ctx.save();
   ctx.translate(rk.x, rk.y);
 
@@ -414,13 +472,27 @@ function drawFireworkShells() {
     var sh = fireworkShells[i];
     if (sh.delay > 0) continue;
     var c = COLORS[sh.ci];
+    var pulse = 1 + Math.sin(tick * 0.4) * 0.12;
     ctx.save();
     ctx.shadowColor = c.glow;
-    ctx.shadowBlur = 12 * S;
-    ctx.fillStyle = '#FFFDF0';
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, 4 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 20 * S;
+    // Coloured halo, so the shell reads against the sand picture as well
+    // as against the grid.
+    ctx.globalAlpha = 0.5;
     ctx.fillStyle = c.fill;
-    ctx.beginPath(); ctx.arc(sh.x, sh.y, 2.2 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 11 * S * pulse, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    // Dark rim first — keeps the shell readable even when it flies over
+    // sand of its own colour.
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(50,30,10,0.55)';
+    ctx.lineWidth = 1.6 * S;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 7.2 * S, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 20 * S;
+    ctx.fillStyle = '#FFFDF0';
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 6.5 * S, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = c.fill;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y, 3.6 * S, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 }

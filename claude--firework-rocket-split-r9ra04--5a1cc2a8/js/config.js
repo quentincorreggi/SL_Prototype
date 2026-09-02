@@ -71,6 +71,11 @@ var FIREWORK_LAUNCH_DELAY = 40;      // frames after level start before the rock
 var FIREWORK_RISE_FRAMES = 42;       // rocket climb duration
 var FIREWORK_SHELL_FRAMES = 34;      // shell dive duration
 var FIREWORK_SHELL_STAGGER = 9;      // frames between shell impacts (double-crackle)
+// Playback speed of the whole show. 1 = full speed, 0.35 = the default
+// slow-mo so every stage is readable. Live-tunable from the debug panel
+// ("Firework speed"); it scales the rocket, the shells, the blast rings,
+// the streamers and the firework particles together.
+var fireworkSpeed = 0.35;
 // Row preference for targets — middle rows first, front row last, so the
 // reward bites into the middle of the level and not the first moves.
 var FIREWORK_ROW_PREF = [3, 4, 2, 5, 1, 6, 0];
@@ -80,6 +85,7 @@ var fireworkRocket = null;           // the rising rocket
 var fireworkShells = [];             // shells diving toward their buckets
 var fireworkStreamers = [];          // bucket → sand-hole link lines
 var fireworkBlasts = [];             // expanding flash rings
+var fireworkGhosts = [];             // destroyed buckets fading out of their cell
 var fireworkLabelT = 0;              // "STREAK BONUS!" label timer
 
 // === COLOR PALETTE (sand + buckets share the palette) ===

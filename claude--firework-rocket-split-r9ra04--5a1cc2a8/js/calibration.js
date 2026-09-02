@@ -68,6 +68,19 @@ function hookGlobalSlider(id, globalName, onChange) {
   hookGlobalSlider('cal-pull',    'ATTRACT_PULL_FRAMES');
   hookGlobalSlider('cal-batch',   'ATTRACT_BATCH');
   hookGlobalSlider('cal-sandint', 'SAND_FRAME_INTERVAL');
+  // Firework playback speed — slider is an integer 5–150; internal
+  // fireworkSpeed is /100 (so 35 → 0.35×, the default slow-mo).
+  var fwEl = document.getElementById('cal-fw-speed');
+  var fwVal = document.getElementById('cal-fw-speed-v');
+  if (fwEl) {
+    fwEl.value = Math.round((typeof fireworkSpeed !== 'undefined' ? fireworkSpeed : 0.35) * 100);
+    if (fwVal) fwVal.textContent = (fwEl.value / 100).toFixed(2) + '×';
+    fwEl.addEventListener('input', function () {
+      fireworkSpeed = parseFloat(fwEl.value) / 100;
+      if (fwVal) fwVal.textContent = fireworkSpeed.toFixed(2) + '×';
+    });
+  }
+  hookGlobalSlider('cal-fw-shells', 'FIREWORK_SHELLS');
   // Subdivision slider — display as "N×N" and refresh the editor's
   // capacity totals (each pixel becomes N² grains).
   var subEl = document.getElementById('cal-subdiv');
